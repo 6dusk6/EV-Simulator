@@ -22,10 +22,12 @@ function normalizeTotal(total, soft) {
 function drawDealer(total, soft, shoe, memo) {
   const normalized = normalizeTotal(total, soft);
   const key = `${shoeKey(shoe)}|${normalized.total}|${normalized.soft ? 1 : 0}`;
+
   if (memo.has(key)) {
     return memo.get(key);
   }
 
+  // Stand on all 17+ (S17)
   if (normalized.total >= 17) {
     const outcome = new Map();
     if (normalized.total > 21) {
@@ -39,17 +41,26 @@ function drawDealer(total, soft, shoe, memo) {
 
   const outcomes = new Map();
   const cardsLeft = totalCards(shoe);
+
   for (let i = 0; i < shoe.length; i += 1) {
     const count = shoe[i];
-    if (count === 0) {
-      continue;
-    }
+    if (count === 0) continue;
+
     const prob = count / cardsLeft;
+
     const nextShoe = shoe.slice();
     nextShoe[i] -= 1;
+
     const added = addCardToTotal(normalized.total, normalized.soft, i);
     const normalizedNext = normalizeTotal(added.total, added.soft);
-    const subOutcomes = drawDealer(normalizedNext.total, normalizedNext.soft, nextShoe, memo);
+
+    const subOutcomes = drawDealer(
+      normalizedNext.total,
+      normalizedNext.soft,
+      nextShoe,
+      memo
+    );
+
     for (const [result, subProb] of subOutcomes.entries()) {
       outcomes.set(result, (outcomes.get(result) || 0) + prob * subProb);
     }
@@ -64,19 +75,22 @@ export function dealerOutcomes(shoe, dealerUpIndex) {
   const outcomes = new Map();
   const memo = new Map();
 
+  // upcard already known
+  const first = addCardToTotal(0, false, dealerUpIndex);
+
   for (let i = 0; i < shoe.length; i += 1) {
     const count = shoe[i];
-    if (count === 0) {
-      continue;
-    }
+    if (count === 0) continue;
+
     const prob = count / cardsLeft;
+
     const nextShoe = shoe.slice();
     nextShoe[i] -= 1;
-    const first = addCardToTotal(0, false, dealerUpIndex);
+
     const second = addCardToTotal(first.total, first.soft, i);
     const normalized = normalizeTotal(second.total, second.soft);
-    const isBlackjack = normalized.total === 21;
 
+    const isBlackjack = normalized.total === 21;
     if (isBlackjack && (dealerUpIndex === ACE_INDEX || dealerUpIndex === TEN_INDEX)) {
       outcomes.set('blackjack', (outcomes.get('blackjack') || 0) + prob);
       continue;

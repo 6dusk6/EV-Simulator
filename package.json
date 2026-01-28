@@ -4,7 +4,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:canon": "vitest run tests/engine.canon.ev.test.js tests/engine.canon.decision.test.js",
+    "test:smoke": "vitest run tests/engine.woo.ev.test.js tests/engine.woo.decision.test.js",
+    "canon:gen": "node tests/generate_canon.js"
   },
   "devDependencies": {
     "vitest": "^2.1.5"
