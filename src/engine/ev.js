@@ -17,22 +17,68 @@ function cloneHands(hands) {
   }));
 }
 
-function stateKey(state) {
-  const handsKey = state.hands
-    .map((hand) => {
-      const flags = [
-        hand.bet,
-        hand.isSplitAces ? 1 : 0,
-        hand.isSplitHand ? 1 : 0,
-        hand.blackjackEligible ? 1 : 0,
-        hand.done ? 1 : 0,
-        hand.bust ? 1 : 0,
-      ].join('');
-      return `${hand.cards.join('')}:${flags}`;
-    })
-    .join('|');
+function handTotalSoft(cards) {
+  let total = 0;
+  let aces = 0;
 
-  return `${shoeKey(state.shoe)}|${state.index}|${handsKey}`;
+  for (const r of cards) {
+    if (r === ACE_INDEX) {
+      aces += 1;
+      total += 1;
+    } else if (r === TEN_INDEX) {
+      total += 10;
+    } else {
+      total += r + 1;
+    }
+  }
+
+  let soft = false;
+  if (aces > 0 && total + 10 <= 21) {
+    total += 10;
+    soft = true;
+  }
+
+  return { total, soft };
+}
+
+/**
+ * State key for memoization:
+ * Keep the current hand ordered (decision-specific),
+ * and all other hands as an orderless multiset.
+ */
+function stateKey(state) {
+  const handKey = (hand) => {
+    const { total, soft } = handTotalSoft(hand.cards);
+    const numCards = hand.cards.length;
+
+    const pairRank =
+      numCards === 2 && hand.cards[0] === hand.cards[1] ? hand.cards[0] : -1;
+
+    return [
+      total,
+      soft ? 1 : 0,
+      numCards,
+      pairRank,
+      hand.bet,
+      hand.isSplitAces ? 1 : 0,
+      hand.isSplitHand ? 1 : 0,
+      hand.blackjackEligible ? 1 : 0,
+      hand.done ? 1 : 0,
+      hand.bust ? 1 : 0,
+    ].join(',');
+  };
+
+  const cur = state.hands[state.index];
+  const curKey = cur ? handKey(cur) : 'END';
+
+  const others = [];
+  for (let i = 0; i < state.hands.length; i++) {
+    if (i === state.index) continue;
+    others.push(handKey(state.hands[i]));
+  }
+  others.sort();
+
+  return `${shoeKey(state.shoe)}|${curKey}|${others.join('|')}`;
 }
 
 
@@ -415,4 +461,3 @@ export function bestAction(evs) {
 
   return best;
 }
-
