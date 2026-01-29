@@ -4,9 +4,11 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "vitest run",
-    "test:canon": "vitest run tests/engine.canon.ev.test.js tests/engine.canon.decision.test.js",
-    "test:smoke": "vitest run tests/engine.woo.ev.test.js tests/engine.woo.decision.test.js",
+    "test": "npm run test:canon && npm run test:smoke",
+
+    "test:canon": "node --max-old-space-size=4096 ./node_modules/vitest/vitest.mjs run tests/engine.canon.ev.test.js tests/engine.canon.decision.test.js --pool=forks --poolOptions.forks.singleFork --no-file-parallelism",
+    "test:smoke": "node --max-old-space-size=4096 ./node_modules/vitest/vitest.mjs run tests/engine.woo.ev.test.js tests/engine.woo.decision.test.js --pool=forks --poolOptions.forks.singleFork --no-file-parallelism",
+
     "canon:gen": "node tests/generate_canon.js"
   },
   "devDependencies": {

@@ -199,6 +199,52 @@ function settleHands(state) {
   return expected;
 }
 
+// --- Memo: sharded Map to avoid V8 "Map maximum size exceeded" (≈ 8.3M entries per Map) ---
+function fnv1a32(str) {
+  let h = 0x811c9dc5; // FNV offset
+  for (let i = 0; i < str.length; i += 1) {
+    h ^= str.charCodeAt(i);
+    // h *= 16777619 (FNV prime) as 32-bit
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h >>> 0;
+}
+
+function createMemo(numBuckets = 256) {
+  if ((numBuckets & (numBuckets - 1)) !== 0) {
+    throw new Error('createMemo: numBuckets must be a power of two');
+  }
+
+  const buckets = Array.from({ length: numBuckets }, () => new Map());
+  let size = 0;
+
+  function bucketFor(key) {
+    const h = fnv1a32(key);
+    return buckets[h & (numBuckets - 1)];
+  }
+
+  return {
+    get(key) {
+      return bucketFor(key).get(key);
+    },
+    has(key) {
+      return bucketFor(key).has(key);
+    },
+    set(key, value) {
+      const b = bucketFor(key);
+      if (!b.has(key)) size += 1;
+      b.set(key, value);
+    },
+    get size() {
+      return size;
+    },
+    clear() {
+      for (const b of buckets) b.clear();
+      size = 0;
+    },
+  };
+}
+
 function bestEV(state, memo) {
   // Progress / Health logging (optional)
   globalThis.__evProg ??= {
@@ -455,7 +501,7 @@ export function computeAllActionsEV({ p1, p2, dealerUp }) {
     actions = actions.filter((a) => a === process.env.ONLY_ACTION);
   }
 
-  const memo = new Map();
+  const memo = createMemo(256);
   const results = {};
 
   for (const action of actions) {
