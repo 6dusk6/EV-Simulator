@@ -127,8 +127,28 @@ function availableActions(state) {
   return actions;
 }
 
+// Dealer outcomes cache (huge speedup in deep trees like SPLIT)
+const DEALER_OUTCOMES_CACHE = new Map();
+const DEALER_OUTCOMES_CACHE_MAX = Number(process.env.DEALER_CACHE_MAX ?? 20000);
+
+function dealerOutcomesCached(shoe, dealerUp) {
+  const key = `${shoeKey(shoe)}|${dealerUp}`;
+  const cached = DEALER_OUTCOMES_CACHE.get(key);
+  if (cached) return cached;
+
+  const outcomes = dealerOutcomes(shoe, dealerUp);
+  DEALER_OUTCOMES_CACHE.set(key, outcomes);
+
+  // simple safety valve to avoid unbounded growth
+  if (DEALER_OUTCOMES_CACHE.size > DEALER_OUTCOMES_CACHE_MAX) {
+    DEALER_OUTCOMES_CACHE.clear();
+  }
+
+  return outcomes;
+}
+
 function settleHands(state) {
-  const outcomes = dealerOutcomes(state.shoe, state.dealerUp);
+  const outcomes = dealerOutcomesCached(state.shoe, state.dealerUp);
   let expected = 0;
 
   for (const [result, prob] of outcomes.entries()) {
@@ -189,30 +209,26 @@ function bestEV(state, memo) {
   };
   const prog = globalThis.__evProg;
 
-  const PROG_EVERY = Number(process.env.EV_PROG_EVERY ?? 1000);          // count-based
+  const PROG_EVERY = Number(process.env.EV_PROG_EVERY ?? 1000); // count-based
   const PROG_TIME_EVERY = Number(process.env.EV_PROG_TIME_EVERY ?? 2000); // ms-based
 
   function maybeLogProgress() {
     if (process.env.EV_PROGRESS !== '1') return;
 
-    prog.sets++;
-
     const now = Date.now();
-    const elapsedMs = now - prog.t0;
-
-    const hitCount = (prog.sets % PROG_EVERY) === 0;
-    const hitTime = (now - prog.lastLog) >= PROG_TIME_EVERY;
+    const hitCount = prog.sets > 0 && prog.sets % PROG_EVERY === 0;
+    const hitTime = (now - (prog.lastLog ?? now)) >= PROG_TIME_EVERY;
 
     if (!hitCount && !hitTime) return;
 
+    const elapsedMs = now - prog.t0;
+    const deltaMs = now - (prog.lastLog ?? now);
+    const deltaSets = prog.sets - (prog.lastSets ?? 0);
+
+    const avgRatePerSec = elapsedMs > 0 ? (prog.sets / elapsedMs) * 1000 : 0;
+    const instRatePerSec = deltaMs > 0 ? (deltaSets / deltaMs) * 1000 : 0;
+
     const heapMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-
-    const avgRatePerSec =
-      elapsedMs > 0 ? (prog.sets / elapsedMs) * 1000 : 0;
-
-    const instElapsedMs = now - prog.lastLog;
-    const instRatePerSec =
-      instElapsedMs > 0 ? ((prog.sets - prog.lastSets) / instElapsedMs) * 1000 : avgRatePerSec;
 
     prog.lastLog = now;
     prog.lastSets = prog.sets;
@@ -230,6 +246,7 @@ function bestEV(state, memo) {
     });
   }
 
+  // terminal
   if (state.index >= state.hands.length) {
     return settleHands(state);
   }
@@ -239,18 +256,22 @@ function bestEV(state, memo) {
     return memo.get(key);
   }
 
+  // ✅ FIX: hand ist nötig, bevor du handValue(hand.cards) verwendest
   const hand = state.hands[state.index];
 
-  // If current hand is already done, move to next
+  // done -> next hand
   if (hand.done) {
     const nextState = { ...state, index: state.index + 1 };
     const result = bestEV(nextState, memo);
     memo.set(key, result);
+
+    prog.sets++;
     maybeLogProgress();
+
     return result;
   }
 
-  // Bust -> mark and move on
+  // bust -> mark and move on
   const total = handValue(hand.cards);
   if (total > 21) {
     const nextHands = cloneHands(state.hands);
@@ -265,11 +286,14 @@ function bestEV(state, memo) {
 
     const result = bestEV(nextState, memo);
     memo.set(key, result);
+
+    prog.sets++;
     maybeLogProgress();
+
     return result;
   }
 
-  // Choose best action EV
+  // explore actions
   const actions = availableActions(state);
   let maxEV = -Infinity;
 
@@ -279,9 +303,13 @@ function bestEV(state, memo) {
   }
 
   memo.set(key, maxEV);
+
+  prog.sets++;
   maybeLogProgress();
+
   return maxEV;
 }
+
 
 function drawCardEV(state, handler, memo) {
   const cardsLeft = totalCards(state.shoe);
