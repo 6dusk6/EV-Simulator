@@ -16,7 +16,6 @@
     ['2,2|3', -0.006032],
     ['6,6|2', -0.196581],
   ]);
-  const SPLIT_WORKER_TIMEOUT_MS = 2500;
 
   const createShoe = () => BASE_COUNTS.slice();
   const removeCard = (shoe, rank) => {
@@ -551,33 +550,7 @@
     if (precomputedSplit !== undefined) {
       return precomputedSplit;
     }
-
-    const shoe = createShoe();
-    removeCard(shoe, p1);
-    removeCard(shoe, p2);
-    removeCard(shoe, dealerUp);
-
-    const hands = [
-      {
-        cards: [RANK_INDEX[p1], RANK_INDEX[p2]],
-        bet: 1,
-        isSplitAces: false,
-        isSplitHand: false,
-        blackjackEligible: true,
-        done: false,
-        bust: false,
-      },
-    ];
-
-    const state = {
-      shoe,
-      dealerUp: RANK_INDEX[dealerUp],
-      hands,
-      index: 0,
-    };
-
-    const memo = createMemo(DEFAULT_MEMO_BUCKETS);
-    return evaluateAction(state, 'SPLIT', memo);
+    return null;
   };
 
   const splitWorkerMain = () => {
@@ -1125,40 +1098,14 @@
       return 0;
     };
 
-    const computeSplitEVOnly = ({ p1, p2, dealerUp }) => {
-      const splitKey = `${p1},${p2}|${dealerUp}`;
-      const precomputedSplit = PRECOMPUTED_SPLIT_EV.get(splitKey);
-      if (precomputedSplit !== undefined) {
-        return precomputedSplit;
-      }
-
-      const shoe = createShoe();
-      removeCard(shoe, p1);
-      removeCard(shoe, p2);
-      removeCard(shoe, dealerUp);
-
-      const hands = [
-        {
-          cards: [RANK_INDEX[p1], RANK_INDEX[p2]],
-          bet: 1,
-          isSplitAces: false,
-          isSplitHand: false,
-          blackjackEligible: true,
-          done: false,
-          bust: false,
-        },
-      ];
-
-      const state = {
-        shoe,
-        dealerUp: RANK_INDEX[dealerUp],
-        hands,
-        index: 0,
-      };
-
-      const memo = createMemo(DEFAULT_MEMO_BUCKETS);
-      return evaluateAction(state, 'SPLIT', memo);
-    };
+  const computeSplitEVOnly = ({ p1, p2, dealerUp }) => {
+    const splitKey = `${p1},${p2}|${dealerUp}`;
+    const precomputedSplit = PRECOMPUTED_SPLIT_EV.get(splitKey);
+    if (precomputedSplit !== undefined) {
+      return precomputedSplit;
+    }
+    return null;
+  };
 
     self.onmessage = (event) => {
       try {
@@ -1251,7 +1198,7 @@
     tableBody,
     actions,
     evs,
-    { pendingActions = new Set(), pendingLabel = '…' } = {},
+    { pendingActions = new Set(), pendingLabel = '…', missingLabel = 'n/a' } = {},
   ) => {
     tableBody.innerHTML = '';
     let best = null;
@@ -1279,8 +1226,10 @@
       const evCell = document.createElement('td');
       if (pendingActions.has(action)) {
         evCell.textContent = pendingLabel;
-      } else {
+      } else if (typeof evs[action] === 'number') {
         evCell.textContent = formatEV(evs[action]);
+      } else {
+        evCell.textContent = missingLabel;
       }
       if (action === best) {
         evCell.classList.add('evsim-hc__ev--best');
@@ -1299,112 +1248,23 @@
     const dealer = container.querySelector('#evsim-d');
     const button = container.querySelector('.evsim-hc__btn');
     const tableBody = container.querySelector('.evsim-hc__table tbody');
-    let activeWorker = null;
-    let activeTimeout = null;
-    let requestId = 0;
-
     button.addEventListener('click', () => {
       button.disabled = true;
-      if (activeWorker) {
-        activeWorker.terminate();
-        activeWorker = null;
-      }
-      if (activeTimeout) {
-        clearTimeout(activeTimeout);
-        activeTimeout = null;
-      }
-      requestId += 1;
-      const currentRequestId = requestId;
       const { actions, evs } = computeAllActionsEV({
         p1: p1.value,
         p2: p2.value,
         dealerUp: dealer.value,
         includeSplit: false,
       });
-      const pendingActions = new Set();
       if (actions.includes('SPLIT')) {
-        pendingActions.add('SPLIT');
+        evs.SPLIT = computeSplitEVOnly({
+          p1: p1.value,
+          p2: p2.value,
+          dealerUp: dealer.value,
+        });
       }
-      renderResults(tableBody, actions, evs, { pendingActions });
+      renderResults(tableBody, actions, evs);
       button.disabled = false;
-
-      if (!pendingActions.has('SPLIT')) {
-        return;
-      }
-
-      const worker = createSplitWorker();
-      if (!worker) {
-        setTimeout(() => {
-          if (requestId !== currentRequestId) {
-            return;
-          }
-          const splitValue = computeSplitEVOnly({
-            p1: p1.value,
-            p2: p2.value,
-            dealerUp: dealer.value,
-          });
-          evs.SPLIT = splitValue;
-          renderResults(tableBody, actions, evs);
-        }, 0);
-        return;
-      }
-
-      activeWorker = worker;
-      activeTimeout = setTimeout(() => {
-        if (requestId !== currentRequestId) {
-          return;
-        }
-        if (activeWorker) {
-          activeWorker.terminate();
-          activeWorker = null;
-        }
-        activeTimeout = null;
-        renderResults(tableBody, actions, evs, {
-          pendingActions: new Set(['SPLIT']),
-          pendingLabel: 'Timeout',
-        });
-      }, SPLIT_WORKER_TIMEOUT_MS);
-
-      worker.onmessage = (event) => {
-        if (requestId !== currentRequestId) {
-          return;
-        }
-        if (activeTimeout) {
-          clearTimeout(activeTimeout);
-          activeTimeout = null;
-        }
-        activeWorker = null;
-        if (event.data && event.data.error) {
-          renderResults(tableBody, actions, evs, {
-            pendingActions: new Set(['SPLIT']),
-            pendingLabel: 'Fehler',
-          });
-          return;
-        }
-        evs.SPLIT = event.data.result;
-        renderResults(tableBody, actions, evs);
-      };
-
-      worker.onerror = () => {
-        if (requestId !== currentRequestId) {
-          return;
-        }
-        if (activeTimeout) {
-          clearTimeout(activeTimeout);
-          activeTimeout = null;
-        }
-        activeWorker = null;
-        renderResults(tableBody, actions, evs, {
-          pendingActions: new Set(['SPLIT']),
-          pendingLabel: 'Fehler',
-        });
-      };
-
-      worker.postMessage({
-        p1: p1.value,
-        p2: p2.value,
-        dealerUp: dealer.value,
-      });
     });
   };
 
