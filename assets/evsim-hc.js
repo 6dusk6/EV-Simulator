@@ -1248,8 +1248,17 @@
     const dealer = container.querySelector('#evsim-d');
     const button = container.querySelector('.evsim-hc__btn');
     const tableBody = container.querySelector('.evsim-hc__table tbody');
+    const summary = container.querySelector('.evsim-hc__summary');
+    const getSelectLabel = (select) => select.options[select.selectedIndex].textContent;
     button.addEventListener('click', () => {
       button.disabled = true;
+      const p1Label = getSelectLabel(p1);
+      const p2Label = getSelectLabel(p2);
+      const dealerLabel = getSelectLabel(dealer);
+      const handCards = [RANK_INDEX[p1.value], RANK_INDEX[p2.value]];
+      const total = handValue(handCards);
+      const shouldSplit = isPair(handCards);
+      const shouldDouble = total >= 9 && total <= 11;
       const { actions, evs } = computeAllActionsEV({
         p1: p1.value,
         p2: p2.value,
@@ -1264,6 +1273,13 @@
         });
       }
       renderResults(tableBody, actions, evs);
+      if (summary) {
+        const actionFlags = [
+          `SPLIT: ${shouldSplit ? 'ja' : 'nein'}`,
+          `DOUBLE: ${shouldDouble ? 'ja' : 'nein'}`,
+        ];
+        summary.textContent = `Hand: ${p1Label} + ${p2Label} vs ${dealerLabel} (Total: ${total}) · Aktionen: ${actionFlags.join(', ')}`;
+      }
       button.disabled = false;
     });
   };
