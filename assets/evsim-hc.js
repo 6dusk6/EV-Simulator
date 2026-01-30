@@ -1254,15 +1254,8 @@
         p1: p1.value,
         p2: p2.value,
         dealerUp: dealer.value,
-        includeSplit: false,
+        includeSplit: true,
       });
-      if (actions.includes('SPLIT')) {
-        evs.SPLIT = computeSplitEVOnly({
-          p1: p1.value,
-          p2: p2.value,
-          dealerUp: dealer.value,
-        });
-      }
       renderResults(tableBody, actions, evs);
       button.disabled = false;
     });
