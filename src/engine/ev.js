@@ -494,11 +494,12 @@ export function computeAllActionsEV({ p1, p2, dealerUp }) {
       console.time(`ACTION ${action}`);
     }
 
-    if (action === 'SPLIT' && precomputedSplit !== undefined) {
-      results[action] = precomputedSplit;
-    } else {
-      results[action] = evaluateAction(state, action, memo);
+    if (action === 'SPLIT') {
+      results[action] = precomputedSplit !== undefined ? precomputedSplit : null;
+      continue;
     }
+
+    results[action] = evaluateAction(state, action, memo);
 
     if (process.env.EV_ACTION_TIMING === '1') {
       console.timeEnd(`ACTION ${action}`);
