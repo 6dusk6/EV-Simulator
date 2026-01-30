@@ -1,0 +1,17 @@
+{
+  "name": "ev-simulator",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+  "test": "npm run test:canon && npm run test:smoke",
+
+  "test:canon": "node --max-old-space-size=4096 ./node_modules/vitest/vitest.mjs run tests/engine.canon.ev.test.js tests/engine.canon.decision.test.js --pool=forks --poolOptions.forks.singleFork --no-file-parallelism --reporter=verbose --bail=1 --disableConsoleIntercept",
+  "test:smoke": "node --max-old-space-size=4096 ./node_modules/vitest/vitest.mjs run tests/engine.woo.ev.test.js tests/engine.woo.decision.test.js --pool=forks --poolOptions.forks.singleFork --no-file-parallelism --reporter=verbose --bail=1 --disableConsoleIntercept",
+
+  "canon:gen": "node tests/generate_canon.js"
+},
+  "devDependencies": {
+    "vitest": "^2.1.5"
+  }
+}

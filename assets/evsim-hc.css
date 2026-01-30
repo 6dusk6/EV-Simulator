@@ -1,0 +1,74 @@
+.evsim-hc {
+  background: #111111;
+  color: #dddddd;
+  border: 1px solid #555555;
+  border-radius: 10px;
+  padding: 16px;
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  font-family: Arial, sans-serif;
+}
+
+.evsim-hc__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.evsim-hc__label {
+  color: #dddddd;
+}
+
+.evsim-hc__select {
+  background: #111111;
+  color: #dddddd;
+  border: 1px solid #555555;
+  border-radius: 10px;
+  padding: 6px 10px;
+  width: 90px;
+  text-align: right;
+}
+
+.evsim-hc__btn {
+  background: #111111;
+  color: #dddddd;
+  border: 1px solid #555555;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.evsim-hc__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.evsim-hc__table {
+  width: 100%;
+  margin-top: 16px;
+  border-collapse: collapse;
+  border: 1px solid #555555;
+  background: #111111;
+  color: #dddddd;
+}
+
+.evsim-hc__table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #555555;
+}
+
+.evsim-hc__table tr:last-child td {
+  border-bottom: none;
+}
+
+.evsim-hc__table td:first-child {
+  border-right: 1px solid #555555;
+}
+
+.evsim-hc__ev--best {
+  color: #008000;
+}
