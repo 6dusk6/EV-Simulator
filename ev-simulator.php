@@ -61,6 +61,7 @@ function evsimulator_render_handcalc_shortcode(): string
             <label class="evsim-hc__label" for="evsim-d">Dealerkarte</label>
             <?php echo $render_select('evsim-d', 'T'); ?>
         </div>
+        <div class="evsim-hc__summary"></div>
         <button class="evsim-hc__btn" type="button">BERECHNE</button>
         <table class="evsim-hc__table">
             <tbody></tbody>
