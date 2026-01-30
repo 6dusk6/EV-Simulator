@@ -2,17 +2,9 @@ import { RANK_INDEX, ACE_INDEX, TEN_INDEX } from './constants.js';
 import { createShoe, removeCard, totalCards, shoeKey } from './shoe.js';
 import { dealerOutcomes } from './dealer.js';
 import { handValue, isPair, isBlackjack } from './player.js';
+import { DEFAULT_RULES, normalizeRules } from './rules.js';
 
 const ACTION_ORDER = ['HIT', 'STAND', 'DOUBLE', 'SPLIT'];
-
-const PRECOMPUTED_SPLIT_EV = new Map([
-  ['4,4|5', 0.104715],
-  ['9,9|7', 0.364198],
-  ['8,8|T', -0.616464],
-  ['A,A|T', 0.123486],
-  ['2,2|3', -0.006032],
-  ['6,6|2', -0.196581],
-]);
 
 function cloneHands(hands) {
   return hands.map((hand) => ({
@@ -110,20 +102,23 @@ function stateKey(state) {
 }
 
 
-function canDouble(hand) {
+function canDouble(hand, rules) {
   if (hand.isSplitAces) return false;
   if (hand.cards.length !== 2) return false;
+  if (hand.isSplitHand && !rules.doubleAfterSplit) return false;
   const total = handValue(hand.cards);
   return total >= 9 && total <= 11;
 }
 
-function canSplit(hand, handsCount) {
+function canSplit(hand, handsCount, rules) {
   if (hand.cards.length !== 2) return false;
   if (!isPair(hand.cards)) return false;
+  if (hand.isSplitAces && !rules.resplitAces) return false;
   return handsCount < 4;
 }
 
 function availableActions(state) {
+  const rules = state.rules ?? DEFAULT_RULES;
   const hand = state.hands[state.index];
   if (!hand || hand.done) return [];
 
@@ -137,7 +132,7 @@ function availableActions(state) {
   if (hand.isSplitAces) {
     if (hand.cards.length === 1) return ['HIT'];
 
-    const allowSplit = hand.cards[0] === ACE_INDEX && canSplit(hand, handsCount);
+    const allowSplit = hand.cards[0] === ACE_INDEX && canSplit(hand, handsCount, rules);
     if (allowSplit) actions.push('SPLIT');
 
     actions.push('STAND');
@@ -149,8 +144,8 @@ function availableActions(state) {
 
   actions.push('HIT', 'STAND');
 
-  if (canSplit(hand, handsCount)) actions.push('SPLIT');
-  if (canDouble(hand)) actions.push('DOUBLE');
+  if (canSplit(hand, handsCount, rules)) actions.push('SPLIT');
+  if (canDouble(hand, rules)) actions.push('DOUBLE');
 
   return actions;
 }
@@ -159,12 +154,12 @@ function availableActions(state) {
 const DEALER_OUTCOMES_CACHE = new Map();
 const DEALER_OUTCOMES_CACHE_MAX = Number(process.env.DEALER_CACHE_MAX ?? 20000);
 
-function dealerOutcomesCached(shoe, dealerUp) {
-  const key = `${shoeKey(shoe)}|${dealerUp}`;
+function dealerOutcomesCached(shoe, dealerUp, rules) {
+  const key = `${shoeKey(shoe)}|${dealerUp}|${rules.hitSoft17 ? 1 : 0}`;
   const cached = DEALER_OUTCOMES_CACHE.get(key);
   if (cached) return cached;
 
-  const outcomes = dealerOutcomes(shoe, dealerUp);
+  const outcomes = dealerOutcomes(shoe, dealerUp, rules);
   DEALER_OUTCOMES_CACHE.set(key, outcomes);
 
   // simple safety valve to avoid unbounded growth
@@ -176,7 +171,8 @@ function dealerOutcomesCached(shoe, dealerUp) {
 }
 
 function settleHands(state) {
-  const outcomes = dealerOutcomesCached(state.shoe, state.dealerUp);
+  const rules = state.rules ?? DEFAULT_RULES;
+  const outcomes = dealerOutcomesCached(state.shoe, state.dealerUp, rules);
   let expected = 0;
 
   for (const [result, prob] of outcomes.entries()) {
@@ -271,6 +267,10 @@ function createMemo(numBuckets = 256) {
       size = 0;
     },
   };
+}
+
+export function createEvMemo(numBuckets = DEFAULT_MEMO_BUCKETS) {
+  return createMemo(numBuckets);
 }
 
 const MAX_MEMO_SIZE = Number(process.env.EV_MEMO_MAX ?? 2_000_000); // sicher unter V8-Grenze
@@ -451,8 +451,9 @@ function evaluateAction(state, action, memo) {
   return 0;
 }
 
-export function computeAllActionsEV({ p1, p2, dealerUp }) {
-  const shoe = createShoe();
+export function computeAllActionsEV({ p1, p2, dealerUp, rules, splitEVs }) {
+  const normalizedRules = normalizeRules(rules);
+  const shoe = createShoe(normalizedRules);
   removeCard(shoe, p1);
   removeCard(shoe, p2);
   removeCard(shoe, dealerUp);
@@ -474,6 +475,7 @@ export function computeAllActionsEV({ p1, p2, dealerUp }) {
     dealerUp: RANK_INDEX[dealerUp],
     hands,
     index: 0,
+    rules: normalizedRules,
   };
 
   let actions = availableActions(state);
@@ -485,18 +487,20 @@ export function computeAllActionsEV({ p1, p2, dealerUp }) {
 
   const memo = createMemo(DEFAULT_MEMO_BUCKETS);
   const results = {};
-  const splitKey = `${p1},${p2}|${dealerUp}`;
-  const precomputedSplit = PRECOMPUTED_SPLIT_EV.get(splitKey);
-
   for (const action of actions) {
     if (process.env.EV_ACTION_TIMING === '1') {
       console.log(`ACTION ${action} START`);
       console.time(`ACTION ${action}`);
     }
 
-    if (action === 'SPLIT') {
-      results[action] = precomputedSplit !== undefined ? precomputedSplit : null;
-      continue;
+    if (action === 'SPLIT' && splitEVs) {
+      const splitKey = `${p1},${p2}|${dealerUp}`;
+      const precomputedSplit =
+        splitEVs instanceof Map ? splitEVs.get(splitKey) : splitEVs[splitKey];
+      if (precomputedSplit !== undefined) {
+        results[action] = precomputedSplit;
+        continue;
+      }
     }
 
     results[action] = evaluateAction(state, action, memo);
@@ -507,6 +511,37 @@ export function computeAllActionsEV({ p1, p2, dealerUp }) {
   }
 
   return results;
+}
+
+export function computeSplitEV({ p1, p2, dealerUp, rules, memo }) {
+  const normalizedRules = normalizeRules(rules);
+  const shoe = createShoe(normalizedRules);
+  removeCard(shoe, p1);
+  removeCard(shoe, p2);
+  removeCard(shoe, dealerUp);
+
+  const hands = [
+    {
+      cards: [RANK_INDEX[p1], RANK_INDEX[p2]],
+      bet: 1,
+      isSplitAces: false,
+      isSplitHand: false,
+      blackjackEligible: true,
+      done: false,
+      bust: false,
+    },
+  ];
+
+  const state = {
+    shoe,
+    dealerUp: RANK_INDEX[dealerUp],
+    hands,
+    index: 0,
+    rules: normalizedRules,
+  };
+
+  const workingMemo = memo ?? createMemo(DEFAULT_MEMO_BUCKETS);
+  return evaluateAction(state, 'SPLIT', workingMemo);
 }
 
 export function bestAction(evs) {

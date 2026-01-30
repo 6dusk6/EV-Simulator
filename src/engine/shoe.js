@@ -1,7 +1,15 @@
-import { BASE_COUNTS, RANK_INDEX } from './constants.js';
+import { BASE_COUNTS, COUNTS_PER_DECK, DEFAULT_DECKS, RANK_INDEX } from './constants.js';
+import { normalizeRules } from './rules.js';
 
-export function createShoe() {
-  return BASE_COUNTS.slice();
+export function createShoe(rules) {
+  if (!rules) {
+    return BASE_COUNTS.slice();
+  }
+  const normalized = normalizeRules(rules);
+  if (normalized.decks === DEFAULT_DECKS) {
+    return BASE_COUNTS.slice();
+  }
+  return COUNTS_PER_DECK.map((count) => count * normalized.decks);
 }
 
 export function cloneShoe(shoe) {
