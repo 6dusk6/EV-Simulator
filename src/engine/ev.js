@@ -245,117 +245,68 @@ function createMemo(numBuckets = 256) {
   };
 }
 
+const MAX_MEMO_SIZE = 200_000; // sicher unter V8-Grenze
+
 function bestEV(state, memo) {
-  // Progress / Health logging (optional)
-  globalThis.__evProg ??= {
-    sets: 0,
-    t0: Date.now(),
-    lastLog: Date.now(),
-    lastSets: 0,
-  };
-  const prog = globalThis.__evProg;
-
-  const PROG_EVERY = Number(process.env.EV_PROG_EVERY ?? 1000); // count-based
-  const PROG_TIME_EVERY = Number(process.env.EV_PROG_TIME_EVERY ?? 2000); // ms-based
-
-  function maybeLogProgress() {
-    if (process.env.EV_PROGRESS !== '1') return;
-
-    const now = Date.now();
-    const hitCount = prog.sets > 0 && prog.sets % PROG_EVERY === 0;
-    const hitTime = (now - (prog.lastLog ?? now)) >= PROG_TIME_EVERY;
-
-    if (!hitCount && !hitTime) return;
-
-    const elapsedMs = now - prog.t0;
-    const deltaMs = now - (prog.lastLog ?? now);
-    const deltaSets = prog.sets - (prog.lastSets ?? 0);
-
-    const avgRatePerSec = elapsedMs > 0 ? (prog.sets / elapsedMs) * 1000 : 0;
-    const instRatePerSec = deltaMs > 0 ? (deltaSets / deltaMs) * 1000 : 0;
-
-    const heapMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-
-    prog.lastLog = now;
-    prog.lastSets = prog.sets;
-
-    console.log('EV progress', {
-      memoSize: memo.size,
-      memoSets: prog.sets,
-      avgRatePerSec: Math.round(avgRatePerSec),
-      instRatePerSec: Math.round(instRatePerSec),
-      index: state.index,
-      hands: state.hands.length,
-      cardsLeft: totalCards(state.shoe),
-      heapMB,
-      elapsedMs,
-    });
-  }
-
-  // terminal
+  // TERMINAL
   if (state.index >= state.hands.length) {
     return settleHands(state);
   }
 
   const key = stateKey(state);
-  if (memo.has(key)) {
-    return memo.get(key);
+  const cached = memo.get(key);
+  if (cached !== undefined) {
+    return cached;
   }
 
-  // ✅ FIX: hand ist nötig, bevor du handValue(hand.cards) verwendest
   const hand = state.hands[state.index];
 
-  // done -> next hand
+  // DONE → nächste Hand
   if (hand.done) {
-    const nextState = { ...state, index: state.index + 1 };
-    const result = bestEV(nextState, memo);
-    memo.set(key, result);
-
-    prog.sets++;
-    maybeLogProgress();
-
+    const result = bestEV(
+      { ...state, index: state.index + 1 },
+      memo
+    );
+    memoSet(memo, key, result);
     return result;
   }
 
-  // bust -> mark and move on
-  const total = handValue(hand.cards);
-  if (total > 21) {
+  // BUST → markieren & weiter
+  if (handValue(hand.cards) > 21) {
     const nextHands = cloneHands(state.hands);
-    nextHands[state.index].done = true;
-    nextHands[state.index].bust = true;
-
-    const nextState = {
-      ...state,
-      hands: nextHands,
-      index: state.index + 1,
+    nextHands[state.index] = {
+      ...nextHands[state.index],
+      done: true,
+      bust: true,
     };
 
-    const result = bestEV(nextState, memo);
-    memo.set(key, result);
-
-    prog.sets++;
-    maybeLogProgress();
-
+    const result = bestEV(
+      { ...state, hands: nextHands, index: state.index + 1 },
+      memo
+    );
+    memoSet(memo, key, result);
     return result;
   }
 
-  // explore actions
-  const actions = availableActions(state);
+  // AKTIONEN
   let maxEV = -Infinity;
-
-  for (const action of actions) {
-    const value = evaluateAction(state, action, memo);
-    if (value > maxEV) maxEV = value;
+  for (const action of availableActions(state)) {
+    const ev = evaluateAction(state, action, memo);
+    if (ev > maxEV) maxEV = ev;
   }
 
-  memo.set(key, maxEV);
-
-  prog.sets++;
-  maybeLogProgress();
-
+  memoSet(memo, key, maxEV);
   return maxEV;
 }
 
+// ---- kontrolliertes Memo-Set ----
+function memoSet(memo, key, value) {
+  if (memo.size >= MAX_MEMO_SIZE) {
+    // simples Eviction: alles leeren
+    memo.clear();
+  }
+  memo.set(key, value);
+}
 
 function drawCardEV(state, handler, memo) {
   const cardsLeft = totalCards(state.shoe);
