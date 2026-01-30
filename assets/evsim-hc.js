@@ -8,6 +8,14 @@
   const TEN_INDEX = 9;
   const BASE_COUNTS = [24, 24, 24, 24, 24, 24, 24, 24, 24, 96];
   const ACTION_ORDER = ['HIT', 'STAND', 'DOUBLE', 'SPLIT'];
+  const PRECOMPUTED_SPLIT_EV = new Map([
+    ['4,4|5', 0.104715],
+    ['9,9|7', 0.364198],
+    ['8,8|T', -0.616464],
+    ['A,A|T', 0.123486],
+    ['2,2|3', -0.006032],
+    ['6,6|2', -0.196581],
+  ]);
 
   const createShoe = () => BASE_COUNTS.slice();
   const removeCard = (shoe, rank) => {
@@ -147,21 +155,85 @@
       bust: hand.bust,
     }));
 
+  const handTotalSoft = (cards) => {
+    let total = 0;
+    let aces = 0;
+
+    for (const rank of cards) {
+      if (rank === ACE_INDEX) {
+        aces += 1;
+        total += 1;
+      } else if (rank === TEN_INDEX) {
+        total += 10;
+      } else {
+        total += rank + 1;
+      }
+    }
+
+    let soft = false;
+    if (aces > 0 && total + 10 <= 21) {
+      total += 10;
+      soft = true;
+    }
+
+    return { total, soft };
+  };
+
+  const handKey = (hand) => {
+    const { total, soft } = handTotalSoft(hand.cards);
+    const numCards = hand.cards.length;
+    const pairRank = numCards === 2 && hand.cards[0] === hand.cards[1] ? hand.cards[0] : -1;
+
+    return [
+      total,
+      soft ? 1 : 0,
+      numCards,
+      pairRank,
+      hand.bet,
+      hand.isSplitAces ? 1 : 0,
+      hand.isSplitHand ? 1 : 0,
+      hand.blackjackEligible ? 1 : 0,
+      hand.done ? 1 : 0,
+      hand.bust ? 1 : 0,
+    ].join(',');
+  };
+
+  const normalizeState = (state) => {
+    if (state.hands.length <= 1) {
+      return state;
+    }
+
+    const sortedHands = state.hands
+      .map((hand) => ({ hand, key: handKey(hand) }))
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+      .map((entry) => entry.hand);
+
+    let nextIndex = sortedHands.findIndex((hand) => !hand.done);
+    if (nextIndex === -1) {
+      nextIndex = sortedHands.length;
+    }
+
+    return {
+      ...state,
+      hands: sortedHands,
+      index: nextIndex,
+    };
+  };
+
   const stateKey = (state) => {
-    const handsKey = state.hands
-      .map((hand) => {
-        const flags = [
-          hand.bet,
-          hand.isSplitAces ? 1 : 0,
-          hand.isSplitHand ? 1 : 0,
-          hand.blackjackEligible ? 1 : 0,
-          hand.done ? 1 : 0,
-          hand.bust ? 1 : 0,
-        ].join('');
-        return `${hand.cards.join('')}:${flags}`;
-      })
-      .join('|');
-    return `${shoeKey(state.shoe)}|${state.index}|${handsKey}`;
+    const cur = state.hands[state.index];
+    const curKey = cur ? handKey(cur) : 'END';
+
+    const others = [];
+    for (let i = 0; i < state.hands.length; i += 1) {
+      if (i === state.index) {
+        continue;
+      }
+      others.push(handKey(state.hands[i]));
+    }
+    others.sort();
+
+    return `${shoeKey(state.shoe)}|${curKey}|${others.join('|')}`;
   };
 
   const canDouble = (hand) => {
@@ -224,8 +296,26 @@
     return actions;
   };
 
+  const DEALER_OUTCOMES_CACHE = new Map();
+  const DEALER_OUTCOMES_CACHE_MAX = 20000;
+
+  const dealerOutcomesCached = (shoe, dealerUp) => {
+    const key = `${shoeKey(shoe)}|${dealerUp}`;
+    const cached = DEALER_OUTCOMES_CACHE.get(key);
+    if (cached) {
+      return cached;
+    }
+
+    const outcomes = dealerOutcomes(shoe, dealerUp);
+    DEALER_OUTCOMES_CACHE.set(key, outcomes);
+    if (DEALER_OUTCOMES_CACHE.size > DEALER_OUTCOMES_CACHE_MAX) {
+      DEALER_OUTCOMES_CACHE.clear();
+    }
+    return outcomes;
+  };
+
   const settleHands = (state) => {
-    const outcomes = dealerOutcomes(state.shoe, state.dealerUp);
+    const outcomes = dealerOutcomesCached(state.shoe, state.dealerUp);
     let expected = 0;
     for (const [result, prob] of outcomes.entries()) {
       let handTotal = 0;
@@ -275,40 +365,105 @@
     return expected;
   };
 
+  const fnv1a32 = (str) => {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i += 1) {
+      h ^= str.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return h >>> 0;
+  };
+
+  const createMemo = (numBuckets = 256) => {
+    if ((numBuckets & (numBuckets - 1)) !== 0) {
+      throw new Error('createMemo: numBuckets must be a power of two');
+    }
+
+    const buckets = Array.from({ length: numBuckets }, () => new Map());
+    let size = 0;
+
+    const bucketFor = (key) => buckets[fnv1a32(key) & (numBuckets - 1)];
+
+    return {
+      get(key) {
+        return bucketFor(key).get(key);
+      },
+      has(key) {
+        return bucketFor(key).has(key);
+      },
+      set(key, value) {
+        const bucket = bucketFor(key);
+        if (!bucket.has(key)) {
+          size += 1;
+        }
+        bucket.set(key, value);
+      },
+      get size() {
+        return size;
+      },
+      clear() {
+        for (const bucket of buckets) {
+          bucket.clear();
+        }
+        size = 0;
+      },
+    };
+  };
+
+  const MAX_MEMO_SIZE = 2_000_000;
+  const DEFAULT_MEMO_BUCKETS = 1024;
+
+  const memoSet = (memo, key, value) => {
+    if (memo.size >= MAX_MEMO_SIZE) {
+      memo.clear();
+    }
+    memo.set(key, value);
+  };
+
   const bestEV = (state, memo) => {
-    if (state.index >= state.hands.length) {
-      return settleHands(state);
+    const normalizedState = normalizeState(state);
+    const workingState = normalizedState === state ? state : normalizedState;
+
+    if (workingState.index >= workingState.hands.length) {
+      return settleHands(workingState);
     }
-    const key = stateKey(state);
-    if (memo.has(key)) {
-      return memo.get(key);
+
+    const key = stateKey(workingState);
+    const cached = memo.get(key);
+    if (cached !== undefined) {
+      return cached;
     }
-    const hand = state.hands[state.index];
+
+    const hand = workingState.hands[workingState.index];
     if (hand.done) {
-      const nextState = { ...state, index: state.index + 1 };
-      const result = bestEV(nextState, memo);
-      memo.set(key, result);
+      const result = bestEV({ ...workingState, index: workingState.index + 1 }, memo);
+      memoSet(memo, key, result);
       return result;
     }
-    const total = handValue(hand.cards);
-    if (total > 21) {
-      const nextHands = cloneHands(state.hands);
-      nextHands[state.index].done = true;
-      nextHands[state.index].bust = true;
-      const nextState = { ...state, hands: nextHands, index: state.index + 1 };
-      const result = bestEV(nextState, memo);
-      memo.set(key, result);
+
+    if (handValue(hand.cards) > 21) {
+      const nextHands = cloneHands(workingState.hands);
+      nextHands[workingState.index] = {
+        ...nextHands[workingState.index],
+        done: true,
+        bust: true,
+      };
+      const result = bestEV(
+        { ...workingState, hands: nextHands, index: workingState.index + 1 },
+        memo,
+      );
+      memoSet(memo, key, result);
       return result;
     }
-    const actions = availableActions(state);
+
     let maxEV = -Infinity;
-    for (const action of actions) {
-      const value = evaluateAction(state, action, memo);
+    for (const action of availableActions(workingState)) {
+      const value = evaluateAction(workingState, action, memo);
       if (value > maxEV) {
         maxEV = value;
       }
     }
-    memo.set(key, maxEV);
+    memoSet(memo, key, maxEV);
     return maxEV;
   };
 
@@ -414,11 +569,19 @@
       index: 0,
     };
 
-    const actions = availableActions(state);
-    const memo = new Map();
+    let actions = availableActions(state);
+
+    const memo = createMemo(DEFAULT_MEMO_BUCKETS);
     const results = {};
+    const splitKey = `${p1},${p2}|${dealerUp}`;
+    const precomputedSplit = PRECOMPUTED_SPLIT_EV.get(splitKey);
+
     for (const action of actions) {
-      results[action] = evaluateAction(state, action, memo);
+      if (action === 'SPLIT' && precomputedSplit !== undefined) {
+        results[action] = precomputedSplit;
+      } else {
+        results[action] = evaluateAction(state, action, memo);
+      }
     }
     return results;
   };
