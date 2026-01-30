@@ -410,8 +410,8 @@
     };
   };
 
-  const MAX_MEMO_SIZE = 2_000_000;
-  const DEFAULT_MEMO_BUCKETS = 1024;
+  const MAX_MEMO_SIZE = 4_000_000;
+  const DEFAULT_MEMO_BUCKETS = 2048;
 
   const memoSet = (memo, key, value) => {
     if (memo.size >= MAX_MEMO_SIZE) {
@@ -544,7 +544,14 @@
     return 0;
   };
 
-  const computeAllActionsEV = ({ p1, p2, dealerUp }) => {
+  const computeAllActionsEV = ({
+    p1,
+    p2,
+    dealerUp,
+    actionsOverride = null,
+    includeSplit = true,
+    memo = null,
+  }) => {
     const shoe = createShoe();
     removeCard(shoe, p1);
     removeCard(shoe, p2);
@@ -571,11 +578,17 @@
 
     let actions = availableActions(state);
     const initialHand = hands[0];
-    if (canSplit(initialHand, hands.length) && !actions.includes('SPLIT')) {
+    if (includeSplit && canSplit(initialHand, hands.length) && !actions.includes('SPLIT')) {
       actions = [...actions, 'SPLIT'];
     }
+    if (!includeSplit) {
+      actions = actions.filter((action) => action !== 'SPLIT');
+    }
+    if (actionsOverride) {
+      actions = actionsOverride;
+    }
 
-    const memo = createMemo(DEFAULT_MEMO_BUCKETS);
+    const workingMemo = memo ?? createMemo(DEFAULT_MEMO_BUCKETS);
     const results = {};
     const splitKey = `${p1},${p2}|${dealerUp}`;
     const precomputedSplit = PRECOMPUTED_SPLIT_EV.get(splitKey);
@@ -584,7 +597,7 @@
       if (action === 'SPLIT' && precomputedSplit !== undefined) {
         results[action] = precomputedSplit;
       } else {
-        results[action] = evaluateAction(state, action, memo);
+        results[action] = evaluateAction(state, action, workingMemo);
       }
     }
     return results;
@@ -612,7 +625,7 @@
     return `${sign}${percent.toFixed(3)}%`;
   };
 
-  const renderResults = (tableBody, evs) => {
+  const renderResults = (tableBody, evs, { pendingSplit = false } = {}) => {
     tableBody.innerHTML = '';
     let best = null;
     let bestValue = -Infinity;
@@ -621,6 +634,9 @@
         continue;
       }
       const value = evs[action];
+      if (typeof value !== 'number') {
+        continue;
+      }
       if (value > bestValue) {
         bestValue = value;
         best = action;
@@ -629,14 +645,28 @@
 
     for (const action of ACTION_ORDER) {
       if (!(action in evs)) {
+        if (pendingSplit && action === 'SPLIT') {
+          const row = document.createElement('tr');
+          const labelCell = document.createElement('td');
+          labelCell.textContent = action;
+          const evCell = document.createElement('td');
+          evCell.textContent = '...';
+          row.appendChild(labelCell);
+          row.appendChild(evCell);
+          tableBody.appendChild(row);
+        }
         continue;
       }
       const row = document.createElement('tr');
       const labelCell = document.createElement('td');
       labelCell.textContent = action;
       const evCell = document.createElement('td');
-      evCell.textContent = formatEV(evs[action]);
-      if (action === best) {
+      if (typeof evs[action] === 'number') {
+        evCell.textContent = formatEV(evs[action]);
+      } else {
+        evCell.textContent = '...';
+      }
+      if (action === best && typeof evs[action] === 'number') {
         evCell.classList.add('evsim-hc__ev--best');
       }
       row.appendChild(labelCell);
@@ -654,13 +684,38 @@
 
     button.addEventListener('click', () => {
       button.disabled = true;
-      const evs = computeAllActionsEV({
+      const memo = createMemo(DEFAULT_MEMO_BUCKETS);
+      const baseEvs = computeAllActionsEV({
         p1: p1.value,
         p2: p2.value,
         dealerUp: dealer.value,
+        includeSplit: false,
+        memo,
       });
-      renderResults(tableBody, evs);
-      button.disabled = false;
+      const initialHand = {
+        cards: [RANK_INDEX[p1.value], RANK_INDEX[p2.value]],
+      };
+      const shouldSplit = canSplit(initialHand, 1);
+      const evs = { ...baseEvs };
+      renderResults(tableBody, evs, { pendingSplit: shouldSplit });
+
+      if (!shouldSplit) {
+        button.disabled = false;
+        return;
+      }
+
+      setTimeout(() => {
+        const splitEvs = computeAllActionsEV({
+          p1: p1.value,
+          p2: p2.value,
+          dealerUp: dealer.value,
+          actionsOverride: ['SPLIT'],
+          memo,
+        });
+        Object.assign(evs, splitEvs);
+        renderResults(tableBody, evs);
+        button.disabled = false;
+      }, 0);
     });
   };
 

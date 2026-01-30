@@ -273,8 +273,8 @@ function createMemo(numBuckets = 256) {
   };
 }
 
-const MAX_MEMO_SIZE = Number(process.env.EV_MEMO_MAX ?? 2_000_000); // sicher unter V8-Grenze
-const DEFAULT_MEMO_BUCKETS = Number(process.env.EV_MEMO_BUCKETS ?? 1024);
+const MAX_MEMO_SIZE = Number(process.env.EV_MEMO_MAX ?? 4_000_000); // sicher unter V8-Grenze
+const DEFAULT_MEMO_BUCKETS = Number(process.env.EV_MEMO_BUCKETS ?? 2048);
 
 function bestEV(state, memo) {
   const normalizedState = normalizeState(state);
@@ -451,7 +451,14 @@ function evaluateAction(state, action, memo) {
   return 0;
 }
 
-export function computeAllActionsEV({ p1, p2, dealerUp }) {
+export function computeAllActionsEV({
+  p1,
+  p2,
+  dealerUp,
+  actionsOverride = null,
+  includeSplit = true,
+  memo = null,
+}) {
   const shoe = createShoe();
   removeCard(shoe, p1);
   removeCard(shoe, p2);
@@ -478,8 +485,14 @@ export function computeAllActionsEV({ p1, p2, dealerUp }) {
 
   let actions = availableActions(state);
   const initialHand = hands[0];
-  if (canSplit(initialHand, hands.length) && !actions.includes('SPLIT')) {
+  if (includeSplit && canSplit(initialHand, hands.length) && !actions.includes('SPLIT')) {
     actions = [...actions, 'SPLIT'];
+  }
+  if (!includeSplit) {
+    actions = actions.filter((action) => action !== 'SPLIT');
+  }
+  if (actionsOverride) {
+    actions = actionsOverride;
   }
 
   // Optional: only compute one action (e.g. ONLY_ACTION=SPLIT)
@@ -487,7 +500,7 @@ export function computeAllActionsEV({ p1, p2, dealerUp }) {
     actions = actions.filter((a) => a === process.env.ONLY_ACTION);
   }
 
-  const memo = createMemo(DEFAULT_MEMO_BUCKETS);
+  const workingMemo = memo ?? createMemo(DEFAULT_MEMO_BUCKETS);
   const results = {};
   const splitKey = `${p1},${p2}|${dealerUp}`;
   const precomputedSplit = PRECOMPUTED_SPLIT_EV.get(splitKey);
@@ -501,7 +514,7 @@ export function computeAllActionsEV({ p1, p2, dealerUp }) {
     if (action === 'SPLIT' && precomputedSplit !== undefined) {
       results[action] = precomputedSplit;
     } else {
-      results[action] = evaluateAction(state, action, memo);
+      results[action] = evaluateAction(state, action, workingMemo);
     }
 
     if (process.env.EV_ACTION_TIMING === '1') {
