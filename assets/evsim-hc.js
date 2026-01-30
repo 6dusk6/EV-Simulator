@@ -570,6 +570,10 @@
     };
 
     let actions = availableActions(state);
+    const initialHand = hands[0];
+    if (canSplit(initialHand, hands.length) && !actions.includes('SPLIT')) {
+      actions = [...actions, 'SPLIT'];
+    }
 
     const memo = createMemo(DEFAULT_MEMO_BUCKETS);
     const results = {};

@@ -477,6 +477,10 @@ export function computeAllActionsEV({ p1, p2, dealerUp }) {
   };
 
   let actions = availableActions(state);
+  const initialHand = hands[0];
+  if (canSplit(initialHand, hands.length) && !actions.includes('SPLIT')) {
+    actions = [...actions, 'SPLIT'];
+  }
 
   // Optional: only compute one action (e.g. ONLY_ACTION=SPLIT)
   if (process.env.ONLY_ACTION) {
