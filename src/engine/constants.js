@@ -7,4 +7,6 @@ export const RANK_INDEX = RANKS.reduce((acc, rank, index) => {
 export const ACE_INDEX = 0;
 export const TEN_INDEX = 9;
 
-export const BASE_COUNTS = [24, 24, 24, 24, 24, 24, 24, 24, 24, 96];
+export const COUNTS_PER_DECK = [4, 4, 4, 4, 4, 4, 4, 4, 4, 16];
+export const DEFAULT_DECKS = 6;
+export const BASE_COUNTS = COUNTS_PER_DECK.map((count) => count * DEFAULT_DECKS);

@@ -1,4 +1,5 @@
 import { ACE_INDEX, TEN_INDEX } from './constants.js';
+import { normalizeRules } from './rules.js';
 import { totalCards, shoeKey } from './shoe.js';
 
 function addCardToTotal(total, soft, rankIndex) {
@@ -19,7 +20,7 @@ function normalizeTotal(total, soft) {
   return { total, soft };
 }
 
-function drawDealer(total, soft, shoe, memo) {
+function drawDealer(total, soft, shoe, memo, rules) {
   const normalized = normalizeTotal(total, soft);
   const key = `${shoeKey(shoe)}|${normalized.total}|${normalized.soft ? 1 : 0}`;
 
@@ -27,8 +28,10 @@ function drawDealer(total, soft, shoe, memo) {
     return memo.get(key);
   }
 
-  // Stand on all 17+ (S17)
-  if (normalized.total >= 17) {
+  const mustStand =
+    normalized.total > 17 ||
+    (normalized.total === 17 && (!normalized.soft || !rules.hitSoft17));
+  if (mustStand) {
     const outcome = new Map();
     if (normalized.total > 21) {
       outcome.set('bust', 1);
@@ -58,7 +61,8 @@ function drawDealer(total, soft, shoe, memo) {
       normalizedNext.total,
       normalizedNext.soft,
       nextShoe,
-      memo
+      memo,
+      rules
     );
 
     for (const [result, subProb] of subOutcomes.entries()) {
@@ -70,7 +74,8 @@ function drawDealer(total, soft, shoe, memo) {
   return outcomes;
 }
 
-export function dealerOutcomes(shoe, dealerUpIndex) {
+export function dealerOutcomes(shoe, dealerUpIndex, rulesConfig) {
+  const rules = normalizeRules(rulesConfig);
   const cardsLeft = totalCards(shoe);
   const outcomes = new Map();
   const memo = new Map();
@@ -96,7 +101,7 @@ export function dealerOutcomes(shoe, dealerUpIndex) {
       continue;
     }
 
-    const subOutcomes = drawDealer(normalized.total, normalized.soft, nextShoe, memo);
+    const subOutcomes = drawDealer(normalized.total, normalized.soft, nextShoe, memo, rules);
     for (const [result, subProb] of subOutcomes.entries()) {
       outcomes.set(result, (outcomes.get(result) || 0) + prob * subProb);
     }
