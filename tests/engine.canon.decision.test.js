@@ -4,6 +4,11 @@ import { computeAllActionsEV, bestAction } from '../src/engine/ev.js';
 
 const fixturesUrl = new URL('./fixtures/bj21_canon.json', import.meta.url);
 const fixtures = JSON.parse(fs.readFileSync(fixturesUrl, 'utf8'));
+const splitPrecomputeUrl = new URL(
+  '../assets/precompute/split-ev.S17_DAS_RSA_6D.json',
+  import.meta.url
+);
+const splitPrecompute = JSON.parse(fs.readFileSync(splitPrecomputeUrl, 'utf8'));
 
 const ACTION_ORDER = ['HIT', 'STAND', 'DOUBLE', 'SPLIT'];
 
@@ -36,7 +41,12 @@ describe('bestAction (BJ21 Canon)', () => {
 
       if (SKIP_SLOW && isSlowFixture(f)) continue;
 
-      const evs = computeAllActionsEV({ p1: f.p1, p2: f.p2, dealerUp: f.d });
+      const evs = computeAllActionsEV({
+        p1: f.p1,
+        p2: f.p2,
+        dealerUp: f.d,
+        splitEVs: splitPrecompute,
+      });
       const got = bestAction(evs);
       const expected = expectedBestFromFixture(f.ev);
       expect(got).toBe(expected);

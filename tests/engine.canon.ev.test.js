@@ -4,6 +4,11 @@ import { computeAllActionsEV } from '../src/engine/ev.js';
 
 const fixturesUrl = new URL('./fixtures/bj21_canon.json', import.meta.url);
 const fixtures = JSON.parse(fs.readFileSync(fixturesUrl, 'utf8'));
+const splitPrecomputeUrl = new URL(
+  '../assets/precompute/split-ev.S17_DAS_RSA_6D.json',
+  import.meta.url
+);
+const splitPrecompute = JSON.parse(fs.readFileSync(splitPrecomputeUrl, 'utf8'));
 
 const ONLY_CASE_INDEX =
   process.env.ONLY_CASE_INDEX !== undefined
@@ -46,7 +51,12 @@ describe('computeAllActionsEV (BJ21 Canon)', () => {
       }
 
       const t0 = Date.now();
-      const result = computeAllActionsEV({ p1: f.p1, p2: f.p2, dealerUp: f.d });
+      const result = computeAllActionsEV({
+        p1: f.p1,
+        p2: f.p2,
+        dealerUp: f.d,
+        splitEVs: splitPrecompute,
+      });
       const ms = Date.now() - t0;
 
       if (VERBOSE) console.log(`CASE TIME  #${i}: ${ms}ms`);
