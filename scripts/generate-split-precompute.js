@@ -16,7 +16,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { once } from 'node:events';
 import { RANKS } from '../src/engine/constants.js';
-import { normalizeRules } from '../src/engine/rules.js';
+import { buildRuleTag, normalizeRules } from '../src/engine/rules.js';
 
 const parseArgs = (argv) => {
   const rules = {};
@@ -46,19 +46,6 @@ const parseArgs = (argv) => {
     rules[key] = value;
   }
   return rules;
-};
-
-const buildRuleTag = (rules) => {
-  const normalized = normalizeRules(rules);
-  const parts = [normalized.hitSoft17 ? 'H17' : 'S17'];
-  if (normalized.doubleAfterSplit) {
-    parts.push('DAS');
-  }
-  if (normalized.resplitAces) {
-    parts.push('RSA');
-  }
-  parts.push(`${normalized.decks}D`);
-  return parts.join('_');
 };
 
 const formatDuration = (seconds) => {
@@ -131,6 +118,9 @@ const rules = normalizeRules({
   hitSoft17: cliRules.hitSoft17,
   doubleAfterSplit: cliRules.doubleAfterSplit,
   resplitAces: cliRules.resplitAces,
+  doubleRule: cliRules.doubleRule,
+  peek: cliRules.peek,
+  surrender: cliRules.surrender,
   decks: cliRules.decks,
 });
 
@@ -145,7 +135,7 @@ const totalKeys = RANKS.length * RANKS.length;
 
 console.log(`RULETAG: ${ruleTag}`);
 console.log(
-  `Flags: hitSoft17=${rules.hitSoft17} doubleAfterSplit=${rules.doubleAfterSplit} resplitAces=${rules.resplitAces} decks=${rules.decks}`,
+  `Flags: hitSoft17=${rules.hitSoft17} doubleAfterSplit=${rules.doubleAfterSplit} resplitAces=${rules.resplitAces} doubleRule=${rules.doubleRule} peek=${rules.peek} surrender=${rules.surrender} decks=${rules.decks}`,
 );
 console.log(`Total keys: ${totalKeys}`);
 console.log(`Already done: ${doneKeys.size}`);

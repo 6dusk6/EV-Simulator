@@ -11,21 +11,43 @@
     hitSoft17: false,
     doubleAfterSplit: true,
     resplitAces: true,
+    doubleRule: 'any_two',
+    peek: false,
+    surrender: 'none',
     decks: 6,
   });
   const ACTION_ORDER = ['HIT', 'STAND', 'DOUBLE', 'SPLIT'];
+  const DOUBLE_RULES = new Set(['any_two', '9_10', '9_11']);
+  const SURRENDER_RULES = new Set(['none', 'late']);
+  const normalizeDoubleRule = (value) =>
+    DOUBLE_RULES.has(value) ? value : DEFAULT_RULES.doubleRule;
+  const normalizeSurrender = (value) =>
+    SURRENDER_RULES.has(value) ? value : DEFAULT_RULES.surrender;
   const normalizeRules = (rules = {}) => ({
     hitSoft17: rules.hitSoft17 ?? DEFAULT_RULES.hitSoft17,
     doubleAfterSplit: rules.doubleAfterSplit ?? DEFAULT_RULES.doubleAfterSplit,
     resplitAces: rules.resplitAces ?? DEFAULT_RULES.resplitAces,
+    doubleRule: normalizeDoubleRule(rules.doubleRule ?? DEFAULT_RULES.doubleRule),
+    peek: rules.peek ?? DEFAULT_RULES.peek,
+    surrender: normalizeSurrender(rules.surrender ?? DEFAULT_RULES.surrender),
     decks: rules.decks ?? DEFAULT_RULES.decks,
   });
   const rulesKey = (rules = {}) => {
     const normalized = normalizeRules(rules);
     const softRule = normalized.hitSoft17 ? 'H17' : 'S17';
     const dasRule = normalized.doubleAfterSplit ? 'DAS' : 'NDAS';
-    const rsaRule = normalized.resplitAces ? 'RSA' : 'NRSA';
-    return `${softRule}_${dasRule}_${rsaRule}_${normalized.decks}D`;
+    const doubleRule = (() => {
+      switch (normalized.doubleRule) {
+        case '9_10':
+          return 'DR-9-10';
+        case '9_11':
+          return 'DR-9-11';
+        default:
+          return 'DR-any';
+      }
+    })();
+    const peekRule = normalized.peek ? 'PEEK' : 'NOPEEK';
+    return `${softRule}_${dasRule}_${doubleRule}_${peekRule}_${normalized.decks}D`;
   };
 
   const createShoe = (rules = DEFAULT_RULES) => {
@@ -270,6 +292,12 @@
       return false;
     }
     const total = handValue(hand.cards);
+    if (rules.doubleRule === 'any_two') {
+      return true;
+    }
+    if (rules.doubleRule === '9_10') {
+      return total === 9 || total === 10;
+    }
     return total >= 9 && total <= 11;
   };
 
@@ -751,6 +779,9 @@
         DEFAULT_RULES.doubleAfterSplit,
       ),
       resplitAces: parseRuleBoolean(container.dataset.resplitAces, DEFAULT_RULES.resplitAces),
+      doubleRule: container.dataset.doubleRule ?? DEFAULT_RULES.doubleRule,
+      peek: parseRuleBoolean(container.dataset.peek, DEFAULT_RULES.peek),
+      surrender: container.dataset.surrender ?? DEFAULT_RULES.surrender,
       decks: Number(container.dataset.decks) || DEFAULT_RULES.decks,
     });
 
@@ -779,6 +810,19 @@
       if (ruleName === 'resplitAces') {
         const value = el.type === 'checkbox' ? el.checked : el.value;
         rules.resplitAces = parseRuleBoolean(value, rules.resplitAces);
+        return;
+      }
+      if (ruleName === 'doubleRule') {
+        rules.doubleRule = normalizeDoubleRule(el.value ?? rules.doubleRule);
+        return;
+      }
+      if (ruleName === 'peek') {
+        const value = el.type === 'checkbox' ? el.checked : el.value;
+        rules.peek = parseRuleBoolean(value, rules.peek);
+        return;
+      }
+      if (ruleName === 'surrender') {
+        rules.surrender = normalizeSurrender(el.value ?? rules.surrender);
       }
     });
 
@@ -811,7 +855,7 @@
 
     refreshPrecompute();
 
-    const renderSplitMatrix = (target, splitPrecompute, pairRank) => {
+    const renderSplitMatrix = (target, splitPrecompute, pairRank, ruleTag) => {
       target.innerHTML = '';
       if (!pairRank) {
         return;
@@ -822,7 +866,7 @@
 
       if (!splitPrecompute) {
         const message = document.createElement('div');
-        message.textContent = 'Split-Precompute nicht verfügbar (Datei fehlt).';
+        message.textContent = `Split-Precompute file missing for ${ruleTag}`;
         target.appendChild(message);
         return;
       }
@@ -855,9 +899,23 @@
       const dealerLabel = getSelectLabel(dealer);
       const handCards = [RANK_INDEX[p1.value], RANK_INDEX[p2.value]];
       const total = handValue(handCards);
-      const shouldSplit = isPair(handCards);
-      const shouldDouble = total >= 9 && total <= 11;
       const rules = getRulesConfig(container);
+      const shouldSplit = canSplit(
+        {
+          cards: handCards,
+          isSplitAces: false,
+        },
+        1,
+        rules,
+      );
+      const shouldDouble = canDouble(
+        {
+          cards: handCards,
+          isSplitAces: false,
+          isSplitHand: false,
+        },
+        rules,
+      );
       const { actions, evs } = computeAllActionsEV({
         p1: p1.value,
         p2: p2.value,
@@ -869,12 +927,13 @@
       let splitMissingLabel = null;
       if (actions.includes('SPLIT')) {
         splitPrecompute = await loadSplitPrecompute(rules);
+        const ruleTag = rulesKey(rules);
         const splitKey = getSplitKey(p1.value, p2.value, dealer.value);
         const splitValue = splitPrecompute ? splitPrecompute[splitKey] : null;
         if (typeof splitValue === 'number') {
           evs.SPLIT = splitValue;
         } else if (!splitPrecompute) {
-          splitMissingLabel = 'Split-Precompute nicht verfügbar (Datei fehlt).';
+          splitMissingLabel = `Split-Precompute file missing for ${ruleTag}`;
         } else {
           splitMissingLabel = `Split-Precompute fehlt für KEY ${splitKey}`;
         }
@@ -883,7 +942,12 @@
         missingLabels: splitMissingLabel ? { SPLIT: splitMissingLabel } : {},
       });
       const pairRank = p1.value === p2.value ? p1.value : null;
-      renderSplitMatrix(matrixContainer, splitPrecompute, pairRank);
+      renderSplitMatrix(
+        matrixContainer,
+        splitPrecompute,
+        pairRank,
+        rulesKey(rules),
+      );
       if (summary) {
         const actionFlags = [
           `SPLIT: ${shouldSplit ? 'ja' : 'nein'}`,

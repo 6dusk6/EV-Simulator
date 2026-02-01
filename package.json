@@ -8,8 +8,11 @@
     "test:canon": "node --max-old-space-size=4096 ./node_modules/vitest/vitest.mjs run tests/engine.canon.ev.test.js tests/engine.canon.decision.test.js --pool=forks --poolOptions.forks.singleFork --no-file-parallelism --reporter=verbose --bail=1 --disableConsoleIntercept",
     "test:smoke": "node --max-old-space-size=4096 ./node_modules/vitest/vitest.mjs run tests/engine.woo.ev.test.js tests/engine.woo.decision.test.js --pool=forks --poolOptions.forks.singleFork --no-file-parallelism --reporter=verbose --bail=1 --disableConsoleIntercept",
     "canon:gen": "node tests/generate_canon.js",
-    "precompute:split": "node scripts/generate-split-precompute.js && node scripts/finalize-split-precompute.js S17_DAS_RSA_6D",
+    "precompute:split": "node scripts/generate-split-precompute.js && node scripts/finalize-split-precompute.js S17_DAS_DR-any_NOPEEK_6D",
     "precompute:split:finalize": "node scripts/finalize-split-precompute.js",
+    "precompute:split:template": "node scripts/export-split-template.js",
+    "precompute:split:validate": "node scripts/validate-split-precompute.js",
+    "precompute:split:validate:all": "node scripts/validate-split-precompute.js --all",
     "precompute:split:6d": "node scripts/generate-split-precompute.js --decks=6",
     "precompute:split:6d:h17:das:rsa": "node scripts/generate-split-precompute.js --decks=6 --hitSoft17 --doubleAfterSplit --resplitAces"
   },
