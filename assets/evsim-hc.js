@@ -602,13 +602,7 @@
     }
   };
 
-  const computeSplitEVOnly = (splitPrecompute, { p1, p2, dealerUp }) => {
-    if (!splitPrecompute) {
-      return null;
-    }
-    const splitKey = `${p1},${p2}|${dealerUp}`;
-    return splitPrecompute[splitKey] ?? null;
-  };
+  const getSplitKey = (p1, p2, dealerUp) => `${p1},${p2}|${dealerUp}`;
 
   const computeAllActionsEV = ({
     p1,
@@ -683,7 +677,12 @@
     tableBody,
     actions,
     evs,
-    { pendingActions = new Set(), pendingLabel = '…', missingLabel = 'n/a' } = {},
+    {
+      pendingActions = new Set(),
+      pendingLabel = '…',
+      missingLabel = 'n/a',
+      missingLabels = {},
+    } = {},
   ) => {
     tableBody.innerHTML = '';
     let best = null;
@@ -714,7 +713,7 @@
       } else if (typeof evs[action] === 'number') {
         evCell.textContent = formatEV(evs[action]);
       } else {
-        evCell.textContent = missingLabel;
+        evCell.textContent = missingLabels[action] ?? missingLabel;
       }
       if (action === best) {
         evCell.classList.add('evsim-hc__ev--best');
@@ -794,6 +793,12 @@
     const tableBody = container.querySelector('.evsim-hc__table tbody');
     const summary = container.querySelector('.evsim-hc__summary');
     const getSelectLabel = (select) => select.options[select.selectedIndex].textContent;
+    const matrixContainer = (() => {
+      const block = document.createElement('div');
+      block.className = 'evsim-hc__split-matrix';
+      container.appendChild(block);
+      return block;
+    })();
     const refreshPrecompute = async () => {
       const rules = getRulesConfig(container);
       await loadSplitPrecompute(rules);
@@ -805,6 +810,43 @@
     });
 
     refreshPrecompute();
+
+    const renderSplitMatrix = (target, splitPrecompute, pairRank) => {
+      target.innerHTML = '';
+      if (!pairRank) {
+        return;
+      }
+      const heading = document.createElement('h4');
+      heading.textContent = 'Split EV gegen jede Dealerkarte';
+      target.appendChild(heading);
+
+      if (!splitPrecompute) {
+        const message = document.createElement('div');
+        message.textContent = 'Split-Precompute nicht verfügbar (Datei fehlt).';
+        target.appendChild(message);
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'evsim-hc__table';
+      const body = document.createElement('tbody');
+
+      for (const dealerUp of RANKS) {
+        const row = document.createElement('tr');
+        const labelCell = document.createElement('td');
+        labelCell.textContent = dealerUp;
+        const evCell = document.createElement('td');
+        const splitKey = getSplitKey(pairRank, pairRank, dealerUp);
+        const ev = splitPrecompute[splitKey];
+        evCell.textContent = typeof ev === 'number' ? formatEV(ev) : 'n/a';
+        row.appendChild(labelCell);
+        row.appendChild(evCell);
+        body.appendChild(row);
+      }
+
+      table.appendChild(body);
+      target.appendChild(table);
+    };
 
     button.addEventListener('click', async () => {
       button.disabled = true;
@@ -823,17 +865,25 @@
         includeSplit: false,
         rules,
       });
+      let splitPrecompute = null;
+      let splitMissingLabel = null;
       if (actions.includes('SPLIT')) {
-        const splitPrecompute = await loadSplitPrecompute(rules);
-        evs.SPLIT = computeSplitEVOnly(splitPrecompute, {
-          p1: p1.value,
-          p2: p2.value,
-          dealerUp: dealer.value,
-        });
+        splitPrecompute = await loadSplitPrecompute(rules);
+        const splitKey = getSplitKey(p1.value, p2.value, dealer.value);
+        const splitValue = splitPrecompute ? splitPrecompute[splitKey] : null;
+        if (typeof splitValue === 'number') {
+          evs.SPLIT = splitValue;
+        } else if (!splitPrecompute) {
+          splitMissingLabel = 'Split-Precompute nicht verfügbar (Datei fehlt).';
+        } else {
+          splitMissingLabel = `Split-Precompute fehlt für KEY ${splitKey}`;
+        }
       }
       renderResults(tableBody, actions, evs, {
-        missingLabel: 'Split EV nicht berechnet',
+        missingLabels: splitMissingLabel ? { SPLIT: splitMissingLabel } : {},
       });
+      const pairRank = p1.value === p2.value ? p1.value : null;
+      renderSplitMatrix(matrixContainer, splitPrecompute, pairRank);
       if (summary) {
         const actionFlags = [
           `SPLIT: ${shouldSplit ? 'ja' : 'nein'}`,
