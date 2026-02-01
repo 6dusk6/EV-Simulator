@@ -943,8 +943,11 @@
       {
         label: 'Holecard Peek',
         rule: 'peek',
-        options: [{ value: 'false', label: 'nein' }],
-        disabled: true,
+        options: [
+          { value: 'false', label: 'nein' },
+          { value: 'true', label: 'ja' },
+        ],
+        disabled: false,
       },
     ];
 

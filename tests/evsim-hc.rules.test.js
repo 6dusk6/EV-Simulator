@@ -30,4 +30,18 @@ describe('evsim handcalc rule tags', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toContain(`split-ev.${baseTag}.json`);
   });
+
+  it('updates split ruleTag when peek toggles', () => {
+    const hooks = globalThis.__evsimHcTestHooks;
+    expect(hooks).toBeTruthy();
+
+    const baseRules = hooks.normalizeRules({ peek: false });
+    const nextRules = hooks.normalizeRules({ peek: true });
+    const baseTag = hooks.buildSplitRuleTag(baseRules);
+    const nextTag = hooks.buildSplitRuleTag(nextRules);
+
+    expect(baseTag).not.toEqual(nextTag);
+    expect(baseTag).toContain('NOPEEK');
+    expect(nextTag).toContain('PEEK');
+  });
 });
