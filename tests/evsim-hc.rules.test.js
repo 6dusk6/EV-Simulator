@@ -6,14 +6,14 @@ describe('evsim handcalc rule tags', () => {
     vi.unstubAllGlobals();
   });
 
-  it('updates ruleTag for doubleRule changes and requests the correct split filename', async () => {
+  it('updates split ruleTag for doubleRule changes and requests the correct split filename', async () => {
     const hooks = globalThis.__evsimHcTestHooks;
     expect(hooks).toBeTruthy();
 
     const baseRules = hooks.normalizeRules({ doubleRule: '9-11' });
     const nextRules = hooks.normalizeRules({ doubleRule: '10-11' });
-    const baseTag = hooks.rulesKey(baseRules);
-    const nextTag = hooks.rulesKey(nextRules);
+    const baseTag = hooks.buildSplitRuleTag(baseRules);
+    const nextTag = hooks.buildSplitRuleTag(nextRules);
 
     expect(baseTag).not.toEqual(nextTag);
 
