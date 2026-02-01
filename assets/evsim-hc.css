@@ -72,3 +72,14 @@
 .evsim-hc__ev--best {
   color: #008000;
 }
+
+.evsim-hc__split-matrix {
+  margin-top: 16px;
+  max-width: 100%;
+}
+
+.evsim-hc__split-matrix h4 {
+  margin: 16px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
