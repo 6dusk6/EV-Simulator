@@ -16,7 +16,6 @@
     surrender: 'none',
     decks: 6,
   });
-  const ACTION_ORDER = ['HIT', 'STAND', 'DOUBLE', 'SPLIT'];
   const DOUBLE_RULES = new Set(['any_two', '9_10', '9_11', '10_11', 'any', '9-11', '10-11']);
   const SURRENDER_RULES = new Set(['none', 'late']);
   const normalizeDoubleRule = (value) => {
@@ -739,17 +738,36 @@
     return { actions, evs: results };
   };
 
-  const bestAction = (evs) => {
+  const getActionCandidates = ({ rules, evHit, evStand, evDouble, evSplit }) => {
+    const candidates = [];
+    if (evHit !== undefined) {
+      candidates.push({ action: 'HIT', ev: evHit });
+    }
+    if (evStand !== undefined) {
+      candidates.push({ action: 'STAND', ev: evStand });
+    }
+    if (rules?.surrender === 'late') {
+      candidates.push({ action: 'SURRENDER', ev: -0.5 });
+    }
+    if (evDouble !== undefined) {
+      candidates.push({ action: 'DOUBLE', ev: evDouble });
+    }
+    if (evSplit !== undefined) {
+      candidates.push({ action: 'SPLIT', ev: evSplit });
+    }
+    return candidates;
+  };
+
+  const pickBestAction = (candidates) => {
     let best = null;
     let bestValue = -Infinity;
-    for (const action of ACTION_ORDER) {
-      if (!(action in evs)) {
+    for (const candidate of candidates) {
+      if (typeof candidate.ev !== 'number') {
         continue;
       }
-      const value = evs[action];
-      if (value > bestValue || (value === bestValue && best === null)) {
-        bestValue = value;
-        best = action;
+      if (candidate.ev > bestValue || (candidate.ev === bestValue && best === null)) {
+        bestValue = candidate.ev;
+        best = candidate.action;
       }
     }
     return best;
@@ -763,8 +781,7 @@
 
   const renderResults = (
     tableBody,
-    actions,
-    evs,
+    candidates,
     {
       pendingActions = new Set(),
       pendingLabel = '…',
@@ -773,33 +790,17 @@
     } = {},
   ) => {
     tableBody.innerHTML = '';
-    let best = null;
-    let bestValue = -Infinity;
-    for (const action of actions) {
-      const value = evs[action];
-      if (typeof value !== 'number') {
-        continue;
-      }
-      if (value > bestValue) {
-        bestValue = value;
-        best = action;
-      }
-    }
-
-    const actionsSet = new Set(actions);
+    const best = pickBestAction(candidates);
     const evCells = new Map();
-    for (const action of ACTION_ORDER) {
-      if (!actionsSet.has(action)) {
-        continue;
-      }
+    for (const { action, ev } of candidates) {
       const row = document.createElement('tr');
       const labelCell = document.createElement('td');
       labelCell.textContent = action;
       const evCell = document.createElement('td');
       if (pendingActions.has(action)) {
         evCell.textContent = pendingLabel;
-      } else if (typeof evs[action] === 'number') {
-        evCell.textContent = formatEV(evs[action]);
+      } else if (typeof ev === 'number') {
+        evCell.textContent = formatEV(ev);
       } else {
         evCell.textContent = missingLabels[action] ?? missingLabel;
       }
@@ -1073,6 +1074,7 @@
         rules,
       });
       const shouldSurrender = rules.surrender === 'late';
+      let splitCandidateValue = actions.includes('SPLIT') ? null : undefined;
       let splitPrecompute = null;
       let splitMissingLabel = null;
       if (actions.includes('SPLIT')) {
@@ -1081,6 +1083,7 @@
         const splitValue = splitPrecompute ? splitPrecompute[splitKey] : null;
         if (typeof splitValue === 'number') {
           evs.SPLIT = splitValue;
+          splitCandidateValue = splitValue;
         } else if (!splitPrecompute) {
           splitMissingLabel = `Split-Precompute Datei fehlt: split-ev.${splitRuleTag}.json (key ${splitKey})`;
         } else {
@@ -1088,7 +1091,14 @@
           splitMissingLabel = `Split-Precompute hat keinen Wert für KEY ${splitKey} (ruleTag ${splitRuleTag})`;
         }
       }
-      renderResults(tableBody, actions, evs, {
+      const candidates = getActionCandidates({
+        rules,
+        evHit: evs.HIT,
+        evStand: evs.STAND,
+        evDouble: actions.includes('DOUBLE') ? evs.DOUBLE : undefined,
+        evSplit: splitCandidateValue,
+      });
+      renderResults(tableBody, candidates, {
         missingLabels: splitMissingLabel ? { SPLIT: splitMissingLabel } : {},
       });
       const pairRank = normalizedP1 === normalizedP2 ? normalizedP1 : null;
@@ -1118,6 +1128,8 @@
       buildSplitRuleTag,
       normalizeRules,
       rulesKey,
+      getActionCandidates,
+      pickBestAction,
     };
   }
 
