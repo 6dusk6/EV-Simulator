@@ -107,6 +107,8 @@ function canDouble(hand, rules) {
   if (hand.cards.length !== 2) return false;
   if (hand.isSplitHand && !rules.doubleAfterSplit) return false;
   const total = handValue(hand.cards);
+  if (rules.doubleRule === 'any_two') return true;
+  if (rules.doubleRule === '9_10') return total === 9 || total === 10;
   return total >= 9 && total <= 11;
 }
 

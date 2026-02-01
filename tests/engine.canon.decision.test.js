@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import { computeAllActionsEV, bestAction } from '../src/engine/ev.js';
+import { buildRuleTag, DEFAULT_RULES } from '../src/engine/rules.js';
 
 const fixturesUrl = new URL('./fixtures/bj21_canon.json', import.meta.url);
 const fixtures = JSON.parse(fs.readFileSync(fixturesUrl, 'utf8'));
+const splitRuleTag = buildRuleTag(DEFAULT_RULES);
 const splitPrecomputeUrl = new URL(
-  '../assets/precompute/split-ev.S17_DAS_RSA_6D.json',
-  import.meta.url
+  `../assets/precompute/split-ev.${splitRuleTag}.json`,
+  import.meta.url,
 );
 const splitPrecompute = JSON.parse(fs.readFileSync(splitPrecomputeUrl, 'utf8'));
 
