@@ -32,6 +32,17 @@
     surrender: normalizeSurrender(rules.surrender ?? DEFAULT_RULES.surrender),
     decks: rules.decks ?? DEFAULT_RULES.decks,
   });
+  const normalizeRank = (rank) => {
+    if (rank === undefined || rank === null) {
+      return '';
+    }
+    const normalized = String(rank).trim().toUpperCase();
+    if (normalized === '10') return 'T';
+    if (normalized === 'T') return 'T';
+    if (normalized === 'A') return 'A';
+    if (/^[2-9]$/.test(normalized)) return normalized;
+    return normalized;
+  };
   const rulesKey = (rules = {}) => {
     const normalized = normalizeRules(rules);
     const softRule = normalized.hitSoft17 ? 'H17' : 'S17';
@@ -608,6 +619,7 @@
   })();
 
   const splitPrecomputeCache = new Map();
+  const splitPrecomputeLogged = new WeakSet();
 
   const loadSplitPrecompute = async (rules) => {
     const key = rulesKey(rules);
@@ -630,7 +642,19 @@
     }
   };
 
-  const getSplitKey = (p1, p2, dealerUp) => `${p1},${p2}|${dealerUp}`;
+  const getSplitKey = (p1, p2, dealerUp) =>
+    `${normalizeRank(p1)},${normalizeRank(p2)}|${normalizeRank(dealerUp)}`;
+
+  const logMissingSplitKey = (splitPrecompute, splitKey) => {
+    console.debug(`[evsim] Split precompute missing for key ${splitKey}`);
+    if (splitPrecompute && !splitPrecomputeLogged.has(splitPrecompute)) {
+      splitPrecomputeLogged.add(splitPrecompute);
+      console.debug(
+        '[evsim] Available split precompute keys:',
+        Object.keys(splitPrecompute),
+      );
+    }
+  };
 
   const computeAllActionsEV = ({
     p1,
@@ -640,14 +664,17 @@
     rules = DEFAULT_RULES,
   }) => {
     const normalizedRules = normalizeRules(rules);
+    const normalizedP1 = normalizeRank(p1);
+    const normalizedP2 = normalizeRank(p2);
+    const normalizedDealer = normalizeRank(dealerUp);
     const shoe = createShoe(normalizedRules);
-    removeCard(shoe, p1);
-    removeCard(shoe, p2);
-    removeCard(shoe, dealerUp);
+    removeCard(shoe, normalizedP1);
+    removeCard(shoe, normalizedP2);
+    removeCard(shoe, normalizedDealer);
 
     const hands = [
       {
-        cards: [RANK_INDEX[p1], RANK_INDEX[p2]],
+        cards: [RANK_INDEX[normalizedP1], RANK_INDEX[normalizedP2]],
         bet: 1,
         isSplitAces: false,
         isSplitHand: false,
@@ -659,7 +686,7 @@
 
     const state = {
       shoe,
-      dealerUp: RANK_INDEX[dealerUp],
+      dealerUp: RANK_INDEX[normalizedDealer],
       hands,
       index: 0,
       rules: normalizedRules,
@@ -897,7 +924,13 @@
       const p1Label = getSelectLabel(p1);
       const p2Label = getSelectLabel(p2);
       const dealerLabel = getSelectLabel(dealer);
-      const handCards = [RANK_INDEX[p1.value], RANK_INDEX[p2.value]];
+      const normalizedP1 = normalizeRank(p1.value);
+      const normalizedP2 = normalizeRank(p2.value);
+      const normalizedDealer = normalizeRank(dealer.value);
+      const handCards = [
+        RANK_INDEX[normalizedP1],
+        RANK_INDEX[normalizedP2],
+      ];
       const total = handValue(handCards);
       const rules = getRulesConfig(container);
       const shouldSplit = canSplit(
@@ -917,9 +950,9 @@
         rules,
       );
       const { actions, evs } = computeAllActionsEV({
-        p1: p1.value,
-        p2: p2.value,
-        dealerUp: dealer.value,
+        p1: normalizedP1,
+        p2: normalizedP2,
+        dealerUp: normalizedDealer,
         includeSplit: false,
         rules,
       });
@@ -928,20 +961,21 @@
       if (actions.includes('SPLIT')) {
         splitPrecompute = await loadSplitPrecompute(rules);
         const ruleTag = rulesKey(rules);
-        const splitKey = getSplitKey(p1.value, p2.value, dealer.value);
+        const splitKey = getSplitKey(normalizedP1, normalizedP2, normalizedDealer);
         const splitValue = splitPrecompute ? splitPrecompute[splitKey] : null;
         if (typeof splitValue === 'number') {
           evs.SPLIT = splitValue;
         } else if (!splitPrecompute) {
           splitMissingLabel = `Split-Precompute file missing for ${ruleTag}`;
         } else {
+          logMissingSplitKey(splitPrecompute, splitKey);
           splitMissingLabel = `Split-Precompute fehlt für KEY ${splitKey}`;
         }
       }
       renderResults(tableBody, actions, evs, {
         missingLabels: splitMissingLabel ? { SPLIT: splitMissingLabel } : {},
       });
-      const pairRank = p1.value === p2.value ? p1.value : null;
+      const pairRank = normalizedP1 === normalizedP2 ? normalizedP1 : null;
       renderSplitMatrix(
         matrixContainer,
         splitPrecompute,
