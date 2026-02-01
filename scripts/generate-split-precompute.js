@@ -1,7 +1,22 @@
-import fs from 'node:fs/promises';
+/**
+ * Generate split EV precompute data incrementally (NDJSON).
+ *
+ * Usage:
+ *   node scripts/generate-split-precompute.js --decks=6 --hitSoft17 --doubleAfterSplit --resplitAces
+ *
+ * Resume:
+ *   Re-running the script will skip keys already present in the NDJSON file.
+ *
+ * Finalize:
+ *   node scripts/finalize-split-precompute.js <RULETAG>
+ */
+import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
+import readline from 'node:readline';
+import { once } from 'node:events';
 import { RANKS } from '../src/engine/constants.js';
-import { normalizeRules, rulesKey } from '../src/engine/rules.js';
+import { normalizeRules } from '../src/engine/rules.js';
 
 const parseArgs = (argv) => {
   const rules = {};
@@ -33,6 +48,79 @@ const parseArgs = (argv) => {
   return rules;
 };
 
+const buildRuleTag = (rules) => {
+  const normalized = normalizeRules(rules);
+  const parts = [normalized.hitSoft17 ? 'H17' : 'S17'];
+  if (normalized.doubleAfterSplit) {
+    parts.push('DAS');
+  }
+  if (normalized.resplitAces) {
+    parts.push('RSA');
+  }
+  parts.push(`${normalized.decks}D`);
+  return parts.join('_');
+};
+
+const formatDuration = (seconds) => {
+  if (!Number.isFinite(seconds)) {
+    return 'n/a';
+  }
+  const clamped = Math.max(0, Math.round(seconds));
+  const mins = Math.floor(clamped / 60);
+  const secs = clamped % 60;
+  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+};
+
+const loadDoneKeys = async (filePath) => {
+  const doneKeys = new Set();
+  try {
+    await fsPromises.access(filePath);
+  } catch {
+    return doneKeys;
+  }
+
+  const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
+  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  const parseErrors = [];
+  let lineNumber = 0;
+
+  try {
+    for await (const line of rl) {
+      lineNumber += 1;
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+      try {
+        const entry = JSON.parse(trimmed);
+        if (entry && typeof entry.k === 'string') {
+          doneKeys.add(entry.k);
+        }
+      } catch (error) {
+        parseErrors.push({ lineNumber, error });
+      }
+    }
+  } finally {
+    rl.close();
+    stream.destroy();
+  }
+
+  if (parseErrors.length > 0) {
+    const lastError = parseErrors[parseErrors.length - 1];
+    if (parseErrors.length === 1 && lastError.lineNumber === lineNumber) {
+      console.warn(
+        `Warning: ignoring incomplete trailing line ${lastError.lineNumber} in ${filePath}.`,
+      );
+    } else {
+      throw new Error(
+        `Failed to parse NDJSON ${filePath} (line ${lastError.lineNumber}).`,
+      );
+    }
+  }
+
+  return doneKeys;
+};
+
 const cliRules = parseArgs(process.argv.slice(2));
 process.env.EV_MEMO_MAX = process.env.EV_MEMO_MAX ?? '8000000';
 process.env.EV_MEMO_BUCKETS = process.env.EV_MEMO_BUCKETS ?? '4096';
@@ -46,27 +134,93 @@ const rules = normalizeRules({
   decks: cliRules.decks,
 });
 
-const key = rulesKey(rules);
+const ruleTag = buildRuleTag(rules);
 const outputDir = path.resolve('assets', 'precompute');
-const outputFile = path.join(outputDir, `split-ev.${key}.json`);
+const outputFile = path.join(outputDir, `split-ev.${ruleTag}.ndjson`);
 
-const data = {};
+await fsPromises.mkdir(outputDir, { recursive: true });
+
+const doneKeys = await loadDoneKeys(outputFile);
+const totalKeys = RANKS.length * RANKS.length;
+
+console.log(`RULETAG: ${ruleTag}`);
+console.log(
+  `Flags: hitSoft17=${rules.hitSoft17} doubleAfterSplit=${rules.doubleAfterSplit} resplitAces=${rules.resplitAces} decks=${rules.decks}`,
+);
+console.log(`Total keys: ${totalKeys}`);
+console.log(`Already done: ${doneKeys.size}`);
+console.log(`Output NDJSON: ${outputFile}`);
+
+const writeStream = fs.createWriteStream(outputFile, { flags: 'a' });
+await once(writeStream, 'open');
+
+const logEvery = Number(process.env.PRECOMPUTE_LOG_EVERY ?? '100');
+const flushEvery = Number(process.env.PRECOMPUTE_FLUSH_EVERY ?? '200');
+const startTime = Date.now();
+
+let computed = 0;
+let skipped = 0;
+let processed = doneKeys.size;
+
+const writeLine = async (line) => {
+  if (!writeStream.write(line)) {
+    await once(writeStream, 'drain');
+  }
+};
+
 for (const rank of RANKS) {
   for (const dealerUp of RANKS) {
     const splitKey = `${rank},${rank}|${dealerUp}`;
-    const memo = createEvMemo();
-    const ev = computeSplitEV({
-      p1: rank,
-      p2: rank,
-      dealerUp,
-      rules,
-      memo,
-    });
-    data[splitKey] = Number(ev.toFixed(6));
+    if (doneKeys.has(splitKey)) {
+      skipped += 1;
+      processed += 1;
+    } else {
+      const memo = createEvMemo();
+      const ev = computeSplitEV({
+        p1: rank,
+        p2: rank,
+        dealerUp,
+        rules,
+        memo,
+      });
+      const payload = {
+        k: splitKey,
+        v: Number(ev.toFixed(6)),
+      };
+      await writeLine(`${JSON.stringify(payload)}\n`);
+      computed += 1;
+      processed += 1;
+
+      if (computed % flushEvery === 0 && writeStream.fd) {
+        await fsPromises.fsync(writeStream.fd);
+      }
+    }
+
+    if (processed % logEvery === 0 || processed === totalKeys) {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const rate = processed / Math.max(elapsed, 1e-6);
+      const remaining = totalKeys - processed;
+      const eta = rate > 0 ? remaining / rate : NaN;
+      const percent = ((processed / totalKeys) * 100).toFixed(1);
+      console.log(
+        `Progress: computed=${computed} skipped=${skipped} total=${processed}/${totalKeys} (${percent}%) ETA=${formatDuration(eta)}`,
+      );
+    }
+  }
+
+  if (global.gc) {
+    global.gc();
   }
 }
 
-await fs.mkdir(outputDir, { recursive: true });
-await fs.writeFile(outputFile, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+await new Promise((resolve, reject) => {
+  writeStream.end((err) => {
+    if (err) {
+      reject(err);
+      return;
+    }
+    resolve();
+  });
+});
 
-console.log(`Wrote ${Object.keys(data).length} entries to ${outputFile}`);
+console.log(`Done. Computed ${computed}, skipped ${skipped}.`);
