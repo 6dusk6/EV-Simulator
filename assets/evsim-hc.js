@@ -1072,6 +1072,7 @@
         includeSplit: false,
         rules,
       });
+      const shouldSurrender = rules.surrender === 'late';
       let splitPrecompute = null;
       let splitMissingLabel = null;
       if (actions.includes('SPLIT')) {
@@ -1101,6 +1102,7 @@
         const actionFlags = [
           `SPLIT: ${shouldSplit ? 'ja' : 'nein'}`,
           `DOUBLE: ${shouldDouble ? 'ja' : 'nein'}`,
+          `SURRENDER: ${shouldSurrender ? 'ja' : 'nein'}`,
         ];
         summary.textContent = `Hand: ${p1Label} + ${p2Label} vs ${dealerLabel} (Total: ${total}) · Aktionen: ${actionFlags.join(', ')}`;
       }
