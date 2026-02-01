@@ -72,6 +72,17 @@
     const peekRule = normalized.peek ? 'PEEK' : 'NOPEEK';
     return `${softRule}_${dasRule}_${doubleRule}_${peekRule}_${normalized.decks}D`;
   };
+  const getSplitRelevantRules = (rules = {}) => {
+    const normalized = normalizeRules(rules);
+    return {
+      hitSoft17: normalized.hitSoft17,
+      doubleAfterSplit: normalized.doubleAfterSplit,
+      doubleRule: normalized.doubleRule,
+      peek: normalized.peek,
+      decks: normalized.decks,
+    };
+  };
+  const buildSplitRuleTag = (rules = {}) => rulesKey(getSplitRelevantRules(rules));
 
   const createShoe = (rules = DEFAULT_RULES) => {
     const normalized = normalizeRules(rules);
@@ -642,22 +653,22 @@
   const splitPrecomputeCache = new Map();
   const splitPrecomputeLogged = new WeakSet();
 
-  const loadSplitPrecompute = async (ruleTag) => {
-    if (splitPrecomputeCache.has(ruleTag)) {
-      return splitPrecomputeCache.get(ruleTag);
+  const loadSplitPrecompute = async (splitRuleTag) => {
+    if (splitPrecomputeCache.has(splitRuleTag)) {
+      return splitPrecomputeCache.get(splitRuleTag);
     }
-    const fileUrl = new URL(`precompute/split-ev.${ruleTag}.json`, assetBaseUrl);
+    const fileUrl = new URL(`precompute/split-ev.${splitRuleTag}.json`, assetBaseUrl);
     try {
       const response = await fetch(fileUrl.toString(), { cache: 'force-cache' });
       if (!response.ok) {
-        splitPrecomputeCache.set(ruleTag, null);
+        splitPrecomputeCache.set(splitRuleTag, null);
         return null;
       }
       const data = await response.json();
-      splitPrecomputeCache.set(ruleTag, data);
+      splitPrecomputeCache.set(splitRuleTag, data);
       return data;
     } catch (error) {
-      splitPrecomputeCache.set(ruleTag, null);
+      splitPrecomputeCache.set(splitRuleTag, null);
       return null;
     }
   };
@@ -665,8 +676,10 @@
   const getSplitKey = (p1, p2, dealerUp) =>
     `${normalizeRank(p1)},${normalizeRank(p2)}|${normalizeRank(dealerUp)}`;
 
-  const logMissingSplitKey = (splitPrecompute, splitKey) => {
-    console.debug(`[evsim] Split precompute missing for key ${splitKey}`);
+  const logMissingSplitKey = (splitPrecompute, splitKey, splitRuleTag) => {
+    console.debug(
+      `[evsim] Split precompute missing for key ${splitKey} (ruleTag ${splitRuleTag})`,
+    );
     if (splitPrecompute && !splitPrecomputeLogged.has(splitPrecompute)) {
       splitPrecomputeLogged.add(splitPrecompute);
       console.debug(
@@ -920,8 +933,11 @@
       {
         label: 'Surrender',
         rule: 'surrender',
-        options: [{ value: 'none', label: 'nein' }],
-        disabled: true,
+        options: [
+          { value: 'none', label: 'nein' },
+          { value: 'late', label: 'ja' },
+        ],
+        disabled: false,
       },
       {
         label: 'Holecard Peek',
@@ -981,7 +997,7 @@
       container.appendChild(block);
       return block;
     })();
-    const renderSplitMatrix = (target, splitPrecompute, pairRank, ruleTag) => {
+    const renderSplitMatrix = (target, splitPrecompute, pairRank, splitRuleTag) => {
       target.innerHTML = '';
       if (!pairRank) {
         return;
@@ -992,7 +1008,7 @@
 
       if (!splitPrecompute) {
         const message = document.createElement('div');
-        message.textContent = `Split-Precompute Datei fehlt: split-ev.${ruleTag}.json`;
+        message.textContent = `Split-Precompute Datei fehlt: split-ev.${splitRuleTag}.json`;
         target.appendChild(message);
         return;
       }
@@ -1032,7 +1048,7 @@
       ];
       const total = handValue(handCards);
       const rules = getSelectedRulesFromUI(container);
-      const ruleTag = rulesKey(rules);
+      const splitRuleTag = buildSplitRuleTag(rules);
       const shouldSplit = canSplit(
         {
           cards: handCards,
@@ -1059,16 +1075,16 @@
       let splitPrecompute = null;
       let splitMissingLabel = null;
       if (actions.includes('SPLIT')) {
-        splitPrecompute = await loadSplitPrecompute(ruleTag);
+        splitPrecompute = await loadSplitPrecompute(splitRuleTag);
         const splitKey = getSplitKey(normalizedP1, normalizedP2, normalizedDealer);
         const splitValue = splitPrecompute ? splitPrecompute[splitKey] : null;
         if (typeof splitValue === 'number') {
           evs.SPLIT = splitValue;
         } else if (!splitPrecompute) {
-          splitMissingLabel = `Split-Precompute Datei fehlt: split-ev.${ruleTag}.json`;
+          splitMissingLabel = `Split-Precompute Datei fehlt: split-ev.${splitRuleTag}.json (key ${splitKey})`;
         } else {
-          logMissingSplitKey(splitPrecompute, splitKey);
-          splitMissingLabel = `Split-Precompute hat keinen Wert für KEY ${splitKey} (ruleTag ${ruleTag})`;
+          logMissingSplitKey(splitPrecompute, splitKey, splitRuleTag);
+          splitMissingLabel = `Split-Precompute hat keinen Wert für KEY ${splitKey} (ruleTag ${splitRuleTag})`;
         }
       }
       renderResults(tableBody, actions, evs, {
@@ -1079,7 +1095,7 @@
         matrixContainer,
         splitPrecompute,
         pairRank,
-        ruleTag,
+        splitRuleTag,
       );
       if (summary) {
         const actionFlags = [
@@ -1096,6 +1112,8 @@
     globalThis.__evsimHcTestHooks = {
       getSelectedRulesFromUI,
       loadSplitPrecompute,
+      getSplitRelevantRules,
+      buildSplitRuleTag,
       normalizeRules,
       rulesKey,
     };
