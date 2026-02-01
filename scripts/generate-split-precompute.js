@@ -154,8 +154,9 @@ console.log(`Output NDJSON: ${outputFile}`);
 const writeStream = fs.createWriteStream(outputFile, { flags: 'a' });
 await once(writeStream, 'open');
 
-const logEvery = Number(process.env.PRECOMPUTE_LOG_EVERY ?? '100');
-const flushEvery = Number(process.env.PRECOMPUTE_FLUSH_EVERY ?? '200');
+const logEvery = Number(process.env.PRECOMPUTE_LOG_EVERY ?? '5');
+const flushEvery = Number(process.env.PRECOMPUTE_FLUSH_EVERY ?? '1');
+const heartbeatEveryMs = Number(process.env.PRECOMPUTE_HEARTBEAT_MS ?? '30000');
 const startTime = Date.now();
 
 let computed = 0;
@@ -169,13 +170,22 @@ const writeLine = async (line) => {
 };
 
 for (const rank of RANKS) {
+  const memo = createEvMemo();
   for (const dealerUp of RANKS) {
     const splitKey = `${rank},${rank}|${dealerUp}`;
     if (doneKeys.has(splitKey)) {
       skipped += 1;
       processed += 1;
     } else {
-      const memo = createEvMemo();
+      const keyIndex = processed + 1;
+      console.log(`Computing split key ${splitKey} (${keyIndex}/${totalKeys})`);
+      const keyStart = Date.now();
+      const heartbeat = setInterval(() => {
+        const elapsed = (Date.now() - keyStart) / 1000;
+        console.log(
+          `Heartbeat: still computing ${splitKey} (${formatDuration(elapsed)} elapsed)`,
+        );
+      }, heartbeatEveryMs);
       const ev = computeSplitEV({
         p1: rank,
         p2: rank,
@@ -183,6 +193,7 @@ for (const rank of RANKS) {
         rules,
         memo,
       });
+      clearInterval(heartbeat);
       const payload = {
         k: splitKey,
         v: Number(ev.toFixed(6)),
@@ -191,9 +202,22 @@ for (const rank of RANKS) {
       computed += 1;
       processed += 1;
 
-      if (computed % flushEvery === 0 && writeStream.fd) {
+      if (writeStream.fd && computed % flushEvery === 0) {
         await fsPromises.fsync(writeStream.fd);
       }
+      const keyElapsed = (Date.now() - keyStart) / 1000;
+      const elapsed = (Date.now() - startTime) / 1000;
+      const rate = processed / Math.max(elapsed, 1e-6);
+      const remaining = totalKeys - processed;
+      const eta = rate > 0 ? remaining / rate : NaN;
+      const percent = ((processed / totalKeys) * 100).toFixed(1);
+      console.log(
+        `Finished ${splitKey} in ${formatDuration(
+          keyElapsed,
+        )}. Progress: computed=${computed} skipped=${skipped} total=${processed}/${totalKeys} (${percent}%) ETA=${formatDuration(
+          eta,
+        )}`,
+      );
     }
 
     if (processed % logEvery === 0 || processed === totalKeys) {
@@ -223,4 +247,4 @@ await new Promise((resolve, reject) => {
   });
 });
 
-console.log(`Done. Computed ${computed}, skipped ${skipped}.`);
+console.log(`Done. Computed ${computed}, skipped ${skipped}, total ${processed}.`);
