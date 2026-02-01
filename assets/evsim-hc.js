@@ -17,10 +17,20 @@
     decks: 6,
   });
   const ACTION_ORDER = ['HIT', 'STAND', 'DOUBLE', 'SPLIT'];
-  const DOUBLE_RULES = new Set(['any_two', '9_10', '9_11']);
+  const DOUBLE_RULES = new Set(['any_two', '9_10', '9_11', '10_11', 'any', '9-11', '10-11']);
   const SURRENDER_RULES = new Set(['none', 'late']);
-  const normalizeDoubleRule = (value) =>
-    DOUBLE_RULES.has(value) ? value : DEFAULT_RULES.doubleRule;
+  const normalizeDoubleRule = (value) => {
+    if (value === 'any') {
+      return 'any_two';
+    }
+    if (value === '9-11') {
+      return '9_11';
+    }
+    if (value === '10-11') {
+      return '10_11';
+    }
+    return DOUBLE_RULES.has(value) ? value : DEFAULT_RULES.doubleRule;
+  };
   const normalizeSurrender = (value) =>
     SURRENDER_RULES.has(value) ? value : DEFAULT_RULES.surrender;
   const normalizeRules = (rules = {}) => ({
@@ -53,6 +63,8 @@
           return 'DR-9-10';
         case '9_11':
           return 'DR-9-11';
+        case '10_11':
+          return 'DR-10-11';
         default:
           return 'DR-any';
       }
@@ -308,6 +320,12 @@
     }
     if (rules.doubleRule === '9_10') {
       return total === 9 || total === 10;
+    }
+    if (rules.doubleRule === '10_11') {
+      return total === 10 || total === 11;
+    }
+    if (rules.doubleRule === '9_11') {
+      return total >= 9 && total <= 11;
     }
     return total >= 9 && total <= 11;
   };
@@ -614,6 +632,9 @@
   };
 
   const assetBaseUrl = (() => {
+    if (typeof document === 'undefined') {
+      return new URL('http://localhost/');
+    }
     const scriptUrl = document.currentScript?.src;
     return new URL('.', scriptUrl || window.location.href);
   })();
@@ -621,23 +642,22 @@
   const splitPrecomputeCache = new Map();
   const splitPrecomputeLogged = new WeakSet();
 
-  const loadSplitPrecompute = async (rules) => {
-    const key = rulesKey(rules);
-    if (splitPrecomputeCache.has(key)) {
-      return splitPrecomputeCache.get(key);
+  const loadSplitPrecompute = async (ruleTag) => {
+    if (splitPrecomputeCache.has(ruleTag)) {
+      return splitPrecomputeCache.get(ruleTag);
     }
-    const fileUrl = new URL(`precompute/split-ev.${key}.json`, assetBaseUrl);
+    const fileUrl = new URL(`precompute/split-ev.${ruleTag}.json`, assetBaseUrl);
     try {
       const response = await fetch(fileUrl.toString(), { cache: 'force-cache' });
       if (!response.ok) {
-        splitPrecomputeCache.set(key, null);
+        splitPrecomputeCache.set(ruleTag, null);
         return null;
       }
       const data = await response.json();
-      splitPrecomputeCache.set(key, data);
+      splitPrecomputeCache.set(ruleTag, data);
       return data;
     } catch (error) {
-      splitPrecomputeCache.set(key, null);
+      splitPrecomputeCache.set(ruleTag, null);
       return null;
     }
   };
@@ -798,7 +818,7 @@
     return fallback;
   };
 
-  const getRulesConfig = (container) => {
+  const getSelectedRulesFromUI = (container) => {
     const rules = normalizeRules({
       hitSoft17: parseRuleBoolean(container.dataset.hitSoft17, DEFAULT_RULES.hitSoft17),
       doubleAfterSplit: parseRuleBoolean(
@@ -856,7 +876,98 @@
     return rules;
   };
 
+  const createRulesBlock = (container) => {
+    const rulesBlock = document.createElement('details');
+    rulesBlock.className = 'evsim-hc__rules';
+    rulesBlock.open = true;
+
+    const summary = document.createElement('summary');
+    summary.textContent = 'Tischregeln';
+    rulesBlock.appendChild(summary);
+
+    const body = document.createElement('div');
+    body.className = 'evsim-hc__rules-body';
+
+    const rows = [
+      {
+        label: 'Decks',
+        rule: 'decks',
+        options: [{ value: '6', label: '4+ (6 Decks)' }],
+        disabled: true,
+      },
+      {
+        label: 'Soft 17',
+        rule: 'hitSoft17',
+        options: [{ value: 'S17', label: 'Stand' }],
+        disabled: true,
+      },
+      {
+        label: 'Double Down',
+        rule: 'doubleRule',
+        options: [
+          { value: '9-11', label: '9-11' },
+          { value: '10-11', label: '10-11' },
+          { value: 'any', label: 'Alle Hände' },
+        ],
+        disabled: false,
+      },
+      {
+        label: 'DAS',
+        rule: 'doubleAfterSplit',
+        options: [{ value: 'true', label: 'ja' }],
+        disabled: true,
+      },
+      {
+        label: 'Surrender',
+        rule: 'surrender',
+        options: [{ value: 'none', label: 'nein' }],
+        disabled: true,
+      },
+      {
+        label: 'Holecard Peek',
+        rule: 'peek',
+        options: [{ value: 'false', label: 'nein' }],
+        disabled: true,
+      },
+    ];
+
+    rows.forEach((row) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'evsim-hc__row';
+      const label = document.createElement('label');
+      label.className = 'evsim-hc__label';
+      label.textContent = row.label;
+      const select = document.createElement('select');
+      select.className = 'evsim-hc__select';
+      select.dataset.evsimRule = row.rule;
+      if (row.disabled) {
+        select.disabled = true;
+      }
+      row.options.forEach((option, index) => {
+        const item = document.createElement('option');
+        item.value = option.value;
+        item.textContent = option.label;
+        if (index === 0) {
+          item.selected = true;
+        }
+        select.appendChild(item);
+      });
+      wrapper.appendChild(label);
+      wrapper.appendChild(select);
+      body.appendChild(wrapper);
+    });
+
+    rulesBlock.appendChild(body);
+    const firstRow = container.querySelector('.evsim-hc__row');
+    if (firstRow) {
+      container.insertBefore(rulesBlock, firstRow);
+    } else {
+      container.prepend(rulesBlock);
+    }
+  };
+
   const initCalculator = (container) => {
+    createRulesBlock(container);
     const p1 = container.querySelector('#evsim-p1');
     const p2 = container.querySelector('#evsim-p2');
     const dealer = container.querySelector('#evsim-d');
@@ -870,18 +981,6 @@
       container.appendChild(block);
       return block;
     })();
-    const refreshPrecompute = async () => {
-      const rules = getRulesConfig(container);
-      await loadSplitPrecompute(rules);
-    };
-
-    container.querySelectorAll('[data-evsim-rule]').forEach((el) => {
-      el.addEventListener('change', refreshPrecompute);
-      el.addEventListener('input', refreshPrecompute);
-    });
-
-    refreshPrecompute();
-
     const renderSplitMatrix = (target, splitPrecompute, pairRank, ruleTag) => {
       target.innerHTML = '';
       if (!pairRank) {
@@ -893,7 +992,7 @@
 
       if (!splitPrecompute) {
         const message = document.createElement('div');
-        message.textContent = `Split-Precompute file missing for ${ruleTag}`;
+        message.textContent = `Split-Precompute Datei fehlt: split-ev.${ruleTag}.json`;
         target.appendChild(message);
         return;
       }
@@ -932,7 +1031,8 @@
         RANK_INDEX[normalizedP2],
       ];
       const total = handValue(handCards);
-      const rules = getRulesConfig(container);
+      const rules = getSelectedRulesFromUI(container);
+      const ruleTag = rulesKey(rules);
       const shouldSplit = canSplit(
         {
           cards: handCards,
@@ -959,17 +1059,16 @@
       let splitPrecompute = null;
       let splitMissingLabel = null;
       if (actions.includes('SPLIT')) {
-        splitPrecompute = await loadSplitPrecompute(rules);
-        const ruleTag = rulesKey(rules);
+        splitPrecompute = await loadSplitPrecompute(ruleTag);
         const splitKey = getSplitKey(normalizedP1, normalizedP2, normalizedDealer);
         const splitValue = splitPrecompute ? splitPrecompute[splitKey] : null;
         if (typeof splitValue === 'number') {
           evs.SPLIT = splitValue;
         } else if (!splitPrecompute) {
-          splitMissingLabel = `Split-Precompute file missing for ${ruleTag}`;
+          splitMissingLabel = `Split-Precompute Datei fehlt: split-ev.${ruleTag}.json`;
         } else {
           logMissingSplitKey(splitPrecompute, splitKey);
-          splitMissingLabel = `Split-Precompute fehlt für KEY ${splitKey}`;
+          splitMissingLabel = `Split-Precompute hat keinen Wert für KEY ${splitKey} (ruleTag ${ruleTag})`;
         }
       }
       renderResults(tableBody, actions, evs, {
@@ -980,7 +1079,7 @@
         matrixContainer,
         splitPrecompute,
         pairRank,
-        rulesKey(rules),
+        ruleTag,
       );
       if (summary) {
         const actionFlags = [
@@ -993,9 +1092,20 @@
     });
   };
 
-  document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.evsim-hc').forEach((container) => {
-      initCalculator(container);
+  if (typeof window === 'undefined' && typeof globalThis !== 'undefined') {
+    globalThis.__evsimHcTestHooks = {
+      getSelectedRulesFromUI,
+      loadSplitPrecompute,
+      normalizeRules,
+      rulesKey,
+    };
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.evsim-hc').forEach((container) => {
+        initCalculator(container);
+      });
     });
-  });
+  }
 })();

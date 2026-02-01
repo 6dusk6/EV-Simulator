@@ -18,6 +18,28 @@
   margin-bottom: 12px;
 }
 
+.evsim-hc__rules {
+  border: 1px solid #555555;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+}
+
+.evsim-hc__rules summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+  margin-bottom: 8px;
+}
+
+.evsim-hc__rules summary::-webkit-details-marker {
+  display: none;
+}
+
+.evsim-hc__rules-body .evsim-hc__row:last-child {
+  margin-bottom: 0;
+}
+
 .evsim-hc__label {
   color: #dddddd;
 }
@@ -30,6 +52,11 @@
   padding: 6px 10px;
   width: 90px;
   text-align: right;
+}
+
+.evsim-hc__select:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
 }
 
 .evsim-hc__btn {
