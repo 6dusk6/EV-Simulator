@@ -109,6 +109,8 @@ function canDouble(hand, rules) {
   const total = handValue(hand.cards);
   if (rules.doubleRule === 'any_two') return true;
   if (rules.doubleRule === '9_10') return total === 9 || total === 10;
+  if (rules.doubleRule === '10_11') return total === 10 || total === 11;
+  if (rules.doubleRule === '9_11') return total >= 9 && total <= 11;
   return total >= 9 && total <= 11;
 }
 

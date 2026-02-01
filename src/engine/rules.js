@@ -10,11 +10,21 @@ export const DEFAULT_RULES = Object.freeze({
   decks: DEFAULT_DECKS,
 });
 
-const DOUBLE_RULES = new Set(['any_two', '9_10', '9_11']);
+const DOUBLE_RULES = new Set(['any_two', '9_10', '9_11', '10_11', 'any', '9-11', '10-11']);
 const SURRENDER_RULES = new Set(['none', 'late']);
 
-const normalizeDoubleRule = (rule) =>
-  DOUBLE_RULES.has(rule) ? rule : DEFAULT_RULES.doubleRule;
+const normalizeDoubleRule = (rule) => {
+  if (rule === 'any') {
+    return 'any_two';
+  }
+  if (rule === '9-11') {
+    return '9_11';
+  }
+  if (rule === '10-11') {
+    return '10_11';
+  }
+  return DOUBLE_RULES.has(rule) ? rule : DEFAULT_RULES.doubleRule;
+};
 
 const normalizeSurrender = (rule) =>
   SURRENDER_RULES.has(rule) ? rule : DEFAULT_RULES.surrender;
@@ -41,6 +51,8 @@ export function buildRuleTag(rules = {}) {
         return 'DR-9-10';
       case '9_11':
         return 'DR-9-11';
+      case '10_11':
+        return 'DR-10-11';
       default:
         return 'DR-any';
     }
