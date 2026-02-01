@@ -1,4 +1,4 @@
-import { RANK_INDEX, ACE_INDEX, TEN_INDEX } from './constants.js';
+import { RANK_INDEX, ACE_INDEX, TEN_INDEX, normalizeRank } from './constants.js';
 import { createShoe, removeCard, totalCards, shoeKey } from './shoe.js';
 import { dealerOutcomes } from './dealer.js';
 import { handValue, isPair, isBlackjack } from './player.js';
@@ -455,14 +455,17 @@ function evaluateAction(state, action, memo) {
 
 export function computeAllActionsEV({ p1, p2, dealerUp, rules, splitEVs }) {
   const normalizedRules = normalizeRules(rules);
+  const normalizedP1 = normalizeRank(p1);
+  const normalizedP2 = normalizeRank(p2);
+  const normalizedDealer = normalizeRank(dealerUp);
   const shoe = createShoe(normalizedRules);
-  removeCard(shoe, p1);
-  removeCard(shoe, p2);
-  removeCard(shoe, dealerUp);
+  removeCard(shoe, normalizedP1);
+  removeCard(shoe, normalizedP2);
+  removeCard(shoe, normalizedDealer);
 
   const hands = [
     {
-      cards: [RANK_INDEX[p1], RANK_INDEX[p2]],
+      cards: [RANK_INDEX[normalizedP1], RANK_INDEX[normalizedP2]],
       bet: 1,
       isSplitAces: false,
       isSplitHand: false,
@@ -474,7 +477,7 @@ export function computeAllActionsEV({ p1, p2, dealerUp, rules, splitEVs }) {
 
   const state = {
     shoe,
-    dealerUp: RANK_INDEX[dealerUp],
+    dealerUp: RANK_INDEX[normalizedDealer],
     hands,
     index: 0,
     rules: normalizedRules,
@@ -496,7 +499,7 @@ export function computeAllActionsEV({ p1, p2, dealerUp, rules, splitEVs }) {
     }
 
     if (action === 'SPLIT' && splitEVs) {
-      const splitKey = `${p1},${p2}|${dealerUp}`;
+      const splitKey = `${normalizedP1},${normalizedP2}|${normalizedDealer}`;
       const precomputedSplit =
         splitEVs instanceof Map ? splitEVs.get(splitKey) : splitEVs[splitKey];
       if (precomputedSplit !== undefined) {
@@ -517,14 +520,17 @@ export function computeAllActionsEV({ p1, p2, dealerUp, rules, splitEVs }) {
 
 export function computeSplitEV({ p1, p2, dealerUp, rules, memo }) {
   const normalizedRules = normalizeRules(rules);
+  const normalizedP1 = normalizeRank(p1);
+  const normalizedP2 = normalizeRank(p2);
+  const normalizedDealer = normalizeRank(dealerUp);
   const shoe = createShoe(normalizedRules);
-  removeCard(shoe, p1);
-  removeCard(shoe, p2);
-  removeCard(shoe, dealerUp);
+  removeCard(shoe, normalizedP1);
+  removeCard(shoe, normalizedP2);
+  removeCard(shoe, normalizedDealer);
 
   const hands = [
     {
-      cards: [RANK_INDEX[p1], RANK_INDEX[p2]],
+      cards: [RANK_INDEX[normalizedP1], RANK_INDEX[normalizedP2]],
       bet: 1,
       isSplitAces: false,
       isSplitHand: false,
@@ -536,7 +542,7 @@ export function computeSplitEV({ p1, p2, dealerUp, rules, memo }) {
 
   const state = {
     shoe,
-    dealerUp: RANK_INDEX[dealerUp],
+    dealerUp: RANK_INDEX[normalizedDealer],
     hands,
     index: 0,
     rules: normalizedRules,
