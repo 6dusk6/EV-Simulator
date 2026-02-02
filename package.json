@@ -11,6 +11,7 @@
     "precompute:split": "node scripts/generate-split-precompute.js && node scripts/finalize-split-precompute.js S17_DAS_DR-any_NOPEEK_6D",
     "precompute:split:finalize": "node scripts/finalize-split-precompute.js",
     "precompute:split:template": "node scripts/export-split-template.js",
+    "split:template-to-csv": "node scripts/template-to-split-csv.js",
     "precompute:split:csv:export": "node scripts/export-split-csv-template.js",
     "precompute:split:csv:import": "node scripts/import-split-csv.js",
     "precompute:split:validate": "node scripts/validate-split-precompute.js",
