@@ -928,8 +928,11 @@
       {
         label: 'DAS',
         rule: 'doubleAfterSplit',
-        options: [{ value: 'true', label: 'ja' }],
-        disabled: true,
+        options: [
+          { value: 'true', label: 'ja' },
+          { value: 'false', label: 'nein' },
+        ],
+        disabled: false,
       },
       {
         label: 'Surrender',
