@@ -876,7 +876,13 @@
       }
       if (ruleName === 'hitSoft17') {
         const value = el.type === 'checkbox' ? el.checked : el.value;
-        rules.hitSoft17 = value === 'H17' ? true : parseRuleBoolean(value, rules.hitSoft17);
+        if (value === 'hit' || value === 'H17') {
+          rules.hitSoft17 = true;
+        } else if (value === 'stand' || value === 'S17') {
+          rules.hitSoft17 = false;
+        } else {
+          rules.hitSoft17 = parseRuleBoolean(value, rules.hitSoft17);
+        }
         return;
       }
       if (ruleName === 'doubleAfterSplit') {
@@ -928,8 +934,11 @@
       {
         label: 'Soft 17',
         rule: 'hitSoft17',
-        options: [{ value: 'S17', label: 'Stand' }],
-        disabled: true,
+        options: [
+          { value: 'stand', label: 'Stand' },
+          { value: 'hit', label: 'Hit' },
+        ],
+        disabled: false,
       },
       {
         label: 'Double Down',
@@ -1136,6 +1145,7 @@
           `DOUBLE: ${shouldDouble ? 'ja' : 'nein'}`,
           `SURRENDER: ${shouldSurrender ? 'ja' : 'nein'}`,
           `PEEK: ${rules.peek ? 'ja' : 'nein'}`,
+          `SOFT17: ${rules.hitSoft17 ? 'Hit' : 'Stand'}`,
         ];
         summary.textContent = `Hand: ${p1Label} + ${p2Label} vs ${dealerLabel} (Total: ${total}) · Aktionen: ${actionFlags.join(', ')}`;
       }
