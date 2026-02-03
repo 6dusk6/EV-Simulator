@@ -159,7 +159,9 @@ const DEALER_OUTCOMES_CACHE = new Map();
 const DEALER_OUTCOMES_CACHE_MAX = Number(process.env.DEALER_CACHE_MAX ?? 20000);
 
 function dealerOutcomesCached(shoe, dealerUp, rules) {
-  const key = `${shoeKey(shoe)}|${dealerUp}|${rules.hitSoft17 ? 1 : 0}`;
+  const key = `${shoeKey(shoe)}|${dealerUp}|${rules.hitSoft17 ? 1 : 0}|${
+    rules.peek ? 1 : 0
+  }`;
   const cached = DEALER_OUTCOMES_CACHE.get(key);
   if (cached) return cached;
 
