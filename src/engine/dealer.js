@@ -79,6 +79,7 @@ export function dealerOutcomes(shoe, dealerUpIndex, rulesConfig) {
   const cardsLeft = totalCards(shoe);
   const outcomes = new Map();
   const memo = new Map();
+  let blackjackProb = 0;
 
   // upcard already known
   const first = addCardToTotal(0, false, dealerUpIndex);
@@ -97,6 +98,10 @@ export function dealerOutcomes(shoe, dealerUpIndex, rulesConfig) {
 
     const isBlackjack = normalized.total === 21;
     if (isBlackjack && (dealerUpIndex === ACE_INDEX || dealerUpIndex === TEN_INDEX)) {
+      if (rules.peek) {
+        blackjackProb += prob;
+        continue;
+      }
       outcomes.set('blackjack', (outcomes.get('blackjack') || 0) + prob);
       continue;
     }
@@ -104,6 +109,15 @@ export function dealerOutcomes(shoe, dealerUpIndex, rulesConfig) {
     const subOutcomes = drawDealer(normalized.total, normalized.soft, nextShoe, memo, rules);
     for (const [result, subProb] of subOutcomes.entries()) {
       outcomes.set(result, (outcomes.get(result) || 0) + prob * subProb);
+    }
+  }
+
+  if (rules.peek && (dealerUpIndex === ACE_INDEX || dealerUpIndex === TEN_INDEX)) {
+    const normalization = 1 - blackjackProb;
+    if (normalization > 0) {
+      for (const [result, prob] of outcomes.entries()) {
+        outcomes.set(result, prob / normalization);
+      }
     }
   }
 

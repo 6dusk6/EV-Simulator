@@ -194,6 +194,7 @@
     const cardsLeft = totalCards(shoe);
     const outcomes = new Map();
     const memo = new Map();
+    let blackjackProb = 0;
 
     for (let i = 0; i < shoe.length; i += 1) {
       const count = shoe[i];
@@ -209,6 +210,10 @@
       const isBJ = normalized.total === 21;
 
       if (isBJ && (dealerUpIndex === ACE_INDEX || dealerUpIndex === TEN_INDEX)) {
+        if (rules.peek) {
+          blackjackProb += prob;
+          continue;
+        }
         outcomes.set('blackjack', (outcomes.get('blackjack') || 0) + prob);
         continue;
       }
@@ -216,6 +221,15 @@
       const subOutcomes = drawDealer(normalized.total, normalized.soft, nextShoe, memo, rules);
       for (const [result, subProb] of subOutcomes.entries()) {
         outcomes.set(result, (outcomes.get(result) || 0) + prob * subProb);
+      }
+    }
+
+    if (rules.peek && (dealerUpIndex === ACE_INDEX || dealerUpIndex === TEN_INDEX)) {
+      const normalization = 1 - blackjackProb;
+      if (normalization > 0) {
+        for (const [result, prob] of outcomes.entries()) {
+          outcomes.set(result, prob / normalization);
+        }
       }
     }
 
@@ -397,7 +411,9 @@
   const DEALER_OUTCOMES_CACHE_MAX = 20000;
 
   const dealerOutcomesCached = (shoe, dealerUp, rules) => {
-    const key = `${shoeKey(shoe)}|${dealerUp}|${rules.hitSoft17 ? 1 : 0}`;
+    const key = `${shoeKey(shoe)}|${dealerUp}|${rules.hitSoft17 ? 1 : 0}|${
+      rules.peek ? 1 : 0
+    }`;
     const cached = DEALER_OUTCOMES_CACHE.get(key);
     if (cached) {
       return cached;
@@ -1119,6 +1135,7 @@
           `SPLIT: ${shouldSplit ? 'ja' : 'nein'}`,
           `DOUBLE: ${shouldDouble ? 'ja' : 'nein'}`,
           `SURRENDER: ${shouldSurrender ? 'ja' : 'nein'}`,
+          `PEEK: ${rules.peek ? 'ja' : 'nein'}`,
         ];
         summary.textContent = `Hand: ${p1Label} + ${p2Label} vs ${dealerLabel} (Total: ${total}) · Aktionen: ${actionFlags.join(', ')}`;
       }
