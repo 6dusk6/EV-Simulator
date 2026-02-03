@@ -79,6 +79,15 @@ export function dealerOutcomes(shoe, dealerUpIndex, rulesConfig) {
   const cardsLeft = totalCards(shoe);
   const outcomes = new Map();
   const memo = new Map();
+  const peekActive =
+    rules.peek && (dealerUpIndex === ACE_INDEX || dealerUpIndex === TEN_INDEX);
+  const excludedIndex = peekActive
+    ? dealerUpIndex === ACE_INDEX
+      ? TEN_INDEX
+      : ACE_INDEX
+    : null;
+  const excludedCount = excludedIndex !== null ? shoe[excludedIndex] : 0;
+  const conditionedCardsLeft = peekActive ? cardsLeft - excludedCount : cardsLeft;
 
   // upcard already known
   const first = addCardToTotal(0, false, dealerUpIndex);
@@ -86,8 +95,9 @@ export function dealerOutcomes(shoe, dealerUpIndex, rulesConfig) {
   for (let i = 0; i < shoe.length; i += 1) {
     const count = shoe[i];
     if (count === 0) continue;
+    if (peekActive && i === excludedIndex) continue;
 
-    const prob = count / cardsLeft;
+    const prob = count / conditionedCardsLeft;
 
     const nextShoe = shoe.slice();
     nextShoe[i] -= 1;
@@ -96,7 +106,7 @@ export function dealerOutcomes(shoe, dealerUpIndex, rulesConfig) {
     const normalized = normalizeTotal(second.total, second.soft);
 
     const isBlackjack = normalized.total === 21;
-    if (isBlackjack && (dealerUpIndex === ACE_INDEX || dealerUpIndex === TEN_INDEX)) {
+    if (!peekActive && isBlackjack && (dealerUpIndex === ACE_INDEX || dealerUpIndex === TEN_INDEX)) {
       outcomes.set('blackjack', (outcomes.get('blackjack') || 0) + prob);
       continue;
     }
