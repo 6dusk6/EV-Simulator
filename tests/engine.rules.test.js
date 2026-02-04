@@ -10,4 +10,13 @@ describe('engine rule tags', () => {
     expect(ndasTag).toBe('S17_NDAS_DR-any_NOPEEK_6D');
     expect(dasTag).not.toEqual(ndasTag);
   });
+
+  it('distinguishes S17 vs H17 based on hitSoft17', () => {
+    const s17Tag = buildRuleTag({ ...DEFAULT_RULES, hitSoft17: false });
+    const h17Tag = buildRuleTag({ ...DEFAULT_RULES, hitSoft17: true });
+
+    expect(s17Tag).toContain('S17');
+    expect(h17Tag).toContain('H17');
+    expect(s17Tag).not.toEqual(h17Tag);
+  });
 });
