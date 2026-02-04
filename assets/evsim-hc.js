@@ -928,8 +928,12 @@
       {
         label: 'Decks',
         rule: 'decks',
-        options: [{ value: '6', label: '4+ (6 Decks)' }],
-        disabled: true,
+        options: [
+          { value: '6', label: '4+ Decks' },
+          { value: '2', label: '2 Decks' },
+          { value: '1', label: '1 Deck' },
+        ],
+        disabled: false,
       },
       {
         label: 'Soft 17',
@@ -1140,6 +1144,7 @@
         splitRuleTag,
       );
       if (summary) {
+        const deckSummary = rules.decks === 6 ? '4+ (6)' : `${rules.decks}`;
         const actionFlags = [
           `SPLIT: ${shouldSplit ? 'ja' : 'nein'}`,
           `DOUBLE: ${shouldDouble ? 'ja' : 'nein'}`,
@@ -1147,7 +1152,7 @@
           `PEEK: ${rules.peek ? 'ja' : 'nein'}`,
           `SOFT17: ${rules.hitSoft17 ? 'Hit' : 'Stand'}`,
         ];
-        summary.textContent = `Hand: ${p1Label} + ${p2Label} vs ${dealerLabel} (Total: ${total}) · Aktionen: ${actionFlags.join(', ')}`;
+        summary.textContent = `Hand: ${p1Label} + ${p2Label} vs ${dealerLabel} (Total: ${total}) · Regeln: Decks=${deckSummary} · Aktionen: ${actionFlags.join(', ')}`;
       }
       button.disabled = false;
     });
