@@ -985,13 +985,18 @@
 
     rows.forEach((row) => {
       const wrapper = document.createElement('div');
-      wrapper.className = 'evsim-hc__row';
+      wrapper.className = 'evsim-hc__row evsim-row';
       const label = document.createElement('label');
-      label.className = 'evsim-hc__label';
+      const id = `evsim-rule-${row.rule}`;
+      label.className = 'evsim-hc__label evsim-label';
+      label.htmlFor = id;
       label.textContent = row.label;
       const select = document.createElement('select');
-      select.className = 'evsim-hc__select';
+      select.id = id;
+      select.className = 'evsim-hc__select evsim-select';
       select.dataset.evsimRule = row.rule;
+      const control = document.createElement('div');
+      control.className = 'evsim-control';
       if (row.disabled) {
         select.disabled = true;
       }
@@ -1004,15 +1009,16 @@
         }
         select.appendChild(item);
       });
+      control.appendChild(select);
       wrapper.appendChild(label);
-      wrapper.appendChild(select);
+      wrapper.appendChild(control);
       body.appendChild(wrapper);
     });
 
     rulesBlock.appendChild(body);
-    const firstRow = container.querySelector('.evsim-hc__row');
-    if (firstRow) {
-      container.insertBefore(rulesBlock, firstRow);
+    const cardsBlock = container.querySelector('.evsim-hc__cards');
+    if (cardsBlock) {
+      container.insertBefore(rulesBlock, cardsBlock);
     } else {
       container.prepend(rulesBlock);
     }

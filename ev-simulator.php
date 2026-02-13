@@ -32,7 +32,7 @@ function evsimulator_render_handcalc_shortcode(): string
     ];
 
     $render_select = function (string $id, string $default) use ($options): string {
-        $html = sprintf('<select id="%s" class="evsim-hc__select">', esc_attr($id));
+        $html = sprintf('<select id="%s" class="evsim-hc__select evsim-select">', esc_attr($id));
         foreach ($options as $option) {
             $selected = $option['value'] === $default ? ' selected' : '';
             $html .= sprintf(
@@ -49,17 +49,19 @@ function evsimulator_render_handcalc_shortcode(): string
     ob_start();
     ?>
     <div class="evsim-hc">
-        <div class="evsim-hc__row">
-            <label class="evsim-hc__label" for="evsim-p1">Spielerkarte 1</label>
-            <?php echo $render_select('evsim-p1', 'T'); ?>
-        </div>
-        <div class="evsim-hc__row">
-            <label class="evsim-hc__label" for="evsim-p2">Spielerkarte 2</label>
-            <?php echo $render_select('evsim-p2', '6'); ?>
-        </div>
-        <div class="evsim-hc__row">
-            <label class="evsim-hc__label" for="evsim-d">Dealerkarte</label>
-            <?php echo $render_select('evsim-d', 'T'); ?>
+        <div class="evsim-hc__cards">
+            <div class="evsim-hc__row evsim-row">
+                <label class="evsim-hc__label evsim-label" for="evsim-p1">Spielerkarte 1</label>
+                <div class="evsim-control"><?php echo $render_select('evsim-p1', 'T'); ?></div>
+            </div>
+            <div class="evsim-hc__row evsim-row">
+                <label class="evsim-hc__label evsim-label" for="evsim-p2">Spielerkarte 2</label>
+                <div class="evsim-control"><?php echo $render_select('evsim-p2', '6'); ?></div>
+            </div>
+            <div class="evsim-hc__row evsim-row">
+                <label class="evsim-hc__label evsim-label" for="evsim-d">Dealerkarte</label>
+                <div class="evsim-control"><?php echo $render_select('evsim-d', 'T'); ?></div>
+            </div>
         </div>
         <div class="evsim-hc__summary"></div>
         <button class="evsim-hc__btn" type="button">BERECHNE</button>

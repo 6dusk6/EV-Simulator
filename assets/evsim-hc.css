@@ -1,4 +1,7 @@
 .evsim-hc {
+  --evsim-control-w: 180px;
+  --evsim-row-gap: 12px;
+  --evsim-section-gap: 18px;
   background: #111111;
   color: #dddddd;
   border: 1px solid #555555;
@@ -11,18 +14,18 @@
 }
 
 .evsim-hc__row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr var(--evsim-control-w);
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  column-gap: 12px;
+  margin-bottom: var(--evsim-row-gap);
 }
 
 .evsim-hc__rules {
   border: 1px solid #555555;
   border-radius: 10px;
   padding: 10px 12px;
-  margin-bottom: 16px;
+  margin-bottom: var(--evsim-section-gap);
 }
 
 .evsim-hc__rules summary {
@@ -42,6 +45,8 @@
 
 .evsim-hc__label {
   color: #dddddd;
+  justify-self: start;
+  min-width: 0;
 }
 
 .evsim-hc__select {
@@ -50,8 +55,19 @@
   border: 1px solid #555555;
   border-radius: 10px;
   padding: 6px 10px;
-  width: 90px;
+  width: var(--evsim-control-w);
+  max-width: 100%;
   text-align: right;
+}
+
+.evsim-control {
+  justify-self: end;
+  width: var(--evsim-control-w);
+  max-width: 100%;
+}
+
+.evsim-hc__cards .evsim-hc__row:last-child {
+  margin-bottom: 0;
 }
 
 .evsim-hc__select:disabled {
@@ -109,4 +125,17 @@
   margin: 16px 0 8px;
   font-size: 14px;
   font-weight: 600;
+}
+
+@media (max-width: 520px) {
+  .evsim-hc__row {
+    grid-template-columns: 1fr;
+    row-gap: 6px;
+  }
+
+  .evsim-control,
+  .evsim-hc__select {
+    width: 100%;
+    justify-self: stretch;
+  }
 }
