@@ -31,8 +31,10 @@ function evsimulator_render_handcalc_shortcode(): string
         ['value' => 'A', 'label' => 'A'],
     ];
 
-    $render_select = function (string $id, string $default) use ($options): string {
-        $html = sprintf('<select id="%s" class="evsim-hc__select">', esc_attr($id));
+    $render_select = function (string $id, string $default, string $extra_class = '') use ($options): string {
+        $classes = trim('evsim-hc__select ' . $extra_class);
+        $html = sprintf('<select id="%s" class="%s">', esc_attr($id), esc_attr($classes));
+
         foreach ($options as $option) {
             $selected = $option['value'] === $default ? ' selected' : '';
             $html .= sprintf(
@@ -42,6 +44,7 @@ function evsimulator_render_handcalc_shortcode(): string
                 esc_html($option['label'])
             );
         }
+
         $html .= '</select>';
         return $html;
     };
@@ -50,16 +53,16 @@ function evsimulator_render_handcalc_shortcode(): string
     ?>
     <div class="evsim-hc">
         <div class="evsim-hc__row">
-            <label class="evsim-hc__label" for="evsim-p1">Spielerkarte 1</label>
-            <?php echo $render_select('evsim-p1', 'T'); ?>
+            <label class="evsim-hc__label" for="evsim-p1">Spielerkarte 1:</label>
+            <?php echo $render_select('evsim-p1', 'T', 'evsim-hc__select--card'); ?>
         </div>
         <div class="evsim-hc__row">
-            <label class="evsim-hc__label" for="evsim-p2">Spielerkarte 2</label>
-            <?php echo $render_select('evsim-p2', '6'); ?>
+            <label class="evsim-hc__label" for="evsim-p2">Spielerkarte 2:</label>
+            <?php echo $render_select('evsim-p2', '6', 'evsim-hc__select--card'); ?>
         </div>
         <div class="evsim-hc__row">
-            <label class="evsim-hc__label" for="evsim-d">Dealerkarte</label>
-            <?php echo $render_select('evsim-d', 'T'); ?>
+            <label class="evsim-hc__label" for="evsim-d">Dealerkarte:</label>
+            <?php echo $render_select('evsim-d', 'T', 'evsim-hc__select--card'); ?>
         </div>
         <div class="evsim-hc__summary"></div>
         <button class="evsim-hc__btn" type="button">BERECHNE</button>

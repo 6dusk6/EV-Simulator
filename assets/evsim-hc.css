@@ -50,7 +50,7 @@
   border: 1px solid #555555;
   border-radius: 10px;
   padding: 6px 10px;
-  width: 90px;
+  width: 95px;
   text-align: right;
 }
 
@@ -109,4 +109,8 @@
   margin: 16px 0 8px;
   font-size: 14px;
   font-weight: 600;
+}
+
+.evsim-hc__select--card {
+  width: 117px;
 }
