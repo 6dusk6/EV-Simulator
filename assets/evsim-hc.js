@@ -1035,6 +1035,7 @@
     const p2 = container.querySelector('#evsim-p2');
     const dealer = container.querySelector('#evsim-d');
     const button = container.querySelector('.evsim-hc__btn');
+    const resultsTable = container.querySelector('.evsim-hc__table');
     const tableBody = container.querySelector('.evsim-hc__table tbody');
     const summary = container.querySelector('.evsim-hc__summary');
 
@@ -1079,6 +1080,9 @@
       renderResults(tableBody, candidates, {
         missingLabels: splitMissingLabel ? { SPLIT: splitMissingLabel } : {},
       });
+      if (resultsTable) {
+        resultsTable.classList.add('evsim-hc__table--visible');
+      }
       if (summary) {
         summary.textContent = '';
       }
