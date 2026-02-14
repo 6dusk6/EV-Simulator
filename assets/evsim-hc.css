@@ -27,9 +27,23 @@
 
 .evsim-hc__rules summary {
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 400;
+  text-decoration: underline;
   list-style: none;
   margin-bottom: 8px;
+}
+
+.evsim-hc__rules summary::after {
+  content: '▸';
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 12px;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.evsim-hc__rules[open] summary::after {
+  content: '▾';
 }
 
 .evsim-hc__rules summary::-webkit-details-marker {
