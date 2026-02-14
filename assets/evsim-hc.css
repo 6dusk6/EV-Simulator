@@ -7,7 +7,7 @@
   display: inline-block;
   width: auto;
   max-width: 100%;
-  font-family: Arial, sans-serif;
+  font-family: monospace;
 }
 
 .evsim-hc__row {
@@ -34,10 +34,10 @@
 }
 
 .evsim-hc__rules summary::after {
-  content: '▸';
+  content: '◂';
   display: inline-block;
   margin-left: 4px;
-  font-size: 12px;
+  font-size: 20px;
   line-height: 1;
   text-decoration: none;
 }
