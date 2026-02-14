@@ -795,6 +795,17 @@
     return `${sign}${percent.toFixed(3)}%`;
   };
 
+  const formatActionLabel = (action) => {
+    const labels = {
+      HIT: 'Hit',
+      STAND: 'Stand',
+      DOUBLE: 'Double',
+      SPLIT: 'Split',
+      SURRENDER: 'Surrender',
+    };
+    return labels[action] ?? action;
+  };
+
   const renderResults = (
     tableBody,
     candidates,
@@ -811,7 +822,7 @@
     for (const { action, ev } of candidates) {
       const row = document.createElement('tr');
       const labelCell = document.createElement('td');
-      labelCell.textContent = action;
+      labelCell.textContent = formatActionLabel(action);
       const evCell = document.createElement('td');
       if (pendingActions.has(action)) {
         evCell.textContent = pendingLabel;
