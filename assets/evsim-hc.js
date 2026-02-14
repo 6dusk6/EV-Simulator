@@ -1026,81 +1026,14 @@
     const button = container.querySelector('.evsim-hc__btn');
     const tableBody = container.querySelector('.evsim-hc__table tbody');
     const summary = container.querySelector('.evsim-hc__summary');
-    const getSelectLabel = (select) => select.options[select.selectedIndex].textContent;
-    const matrixContainer = (() => {
-      const block = document.createElement('div');
-      block.className = 'evsim-hc__split-matrix';
-      container.appendChild(block);
-      return block;
-    })();
-    const renderSplitMatrix = (target, splitPrecompute, pairRank, splitRuleTag) => {
-      target.innerHTML = '';
-      if (!pairRank) {
-        return;
-      }
-      const heading = document.createElement('h4');
-      heading.textContent = 'Split EV gegen jede Dealerkarte';
-      target.appendChild(heading);
-
-      if (!splitPrecompute) {
-        const message = document.createElement('div');
-        message.textContent = `Split-Precompute Datei fehlt: split-ev.${splitRuleTag}.json`;
-        target.appendChild(message);
-        return;
-      }
-
-      const table = document.createElement('table');
-      table.className = 'evsim-hc__table';
-      const body = document.createElement('tbody');
-
-      for (const dealerUp of RANKS) {
-        const row = document.createElement('tr');
-        const labelCell = document.createElement('td');
-        labelCell.textContent = dealerUp;
-        const evCell = document.createElement('td');
-        const splitKey = getSplitKey(pairRank, pairRank, dealerUp);
-        const ev = splitPrecompute[splitKey];
-        evCell.textContent = typeof ev === 'number' ? formatEV(ev) : 'n/a';
-        row.appendChild(labelCell);
-        row.appendChild(evCell);
-        body.appendChild(row);
-      }
-
-      table.appendChild(body);
-      target.appendChild(table);
-    };
 
     button.addEventListener('click', async () => {
       button.disabled = true;
-      const p1Label = getSelectLabel(p1);
-      const p2Label = getSelectLabel(p2);
-      const dealerLabel = getSelectLabel(dealer);
       const normalizedP1 = normalizeRank(p1.value);
       const normalizedP2 = normalizeRank(p2.value);
       const normalizedDealer = normalizeRank(dealer.value);
-      const handCards = [
-        RANK_INDEX[normalizedP1],
-        RANK_INDEX[normalizedP2],
-      ];
-      const total = handValue(handCards);
       const rules = getSelectedRulesFromUI(container);
       const splitRuleTag = buildSplitRuleTag(rules);
-      const shouldSplit = canSplit(
-        {
-          cards: handCards,
-          isSplitAces: false,
-        },
-        1,
-        rules,
-      );
-      const shouldDouble = canDouble(
-        {
-          cards: handCards,
-          isSplitAces: false,
-          isSplitHand: false,
-        },
-        rules,
-      );
       const { actions, evs } = computeAllActionsEV({
         p1: normalizedP1,
         p2: normalizedP2,
@@ -1108,7 +1041,6 @@
         includeSplit: false,
         rules,
       });
-      const shouldSurrender = rules.surrender === 'late';
       let splitCandidateValue = actions.includes('SPLIT') ? null : undefined;
       let splitPrecompute = null;
       let splitMissingLabel = null;
@@ -1136,23 +1068,8 @@
       renderResults(tableBody, candidates, {
         missingLabels: splitMissingLabel ? { SPLIT: splitMissingLabel } : {},
       });
-      const pairRank = normalizedP1 === normalizedP2 ? normalizedP1 : null;
-      renderSplitMatrix(
-        matrixContainer,
-        splitPrecompute,
-        pairRank,
-        splitRuleTag,
-      );
       if (summary) {
-        const deckSummary = rules.decks === 6 ? '4+ (6)' : `${rules.decks}`;
-        const actionFlags = [
-          `SPLIT: ${shouldSplit ? 'ja' : 'nein'}`,
-          `DOUBLE: ${shouldDouble ? 'ja' : 'nein'}`,
-          `SURRENDER: ${shouldSurrender ? 'ja' : 'nein'}`,
-          `PEEK: ${rules.peek ? 'ja' : 'nein'}`,
-          `SOFT17: ${rules.hitSoft17 ? 'Hit' : 'Stand'}`,
-        ];
-        summary.textContent = `Hand: ${p1Label} + ${p2Label} vs ${dealerLabel} (Total: ${total}) · Regeln: Decks=${deckSummary} · Aktionen: ${actionFlags.join(', ')}`;
+        summary.textContent = '';
       }
       button.disabled = false;
     });
