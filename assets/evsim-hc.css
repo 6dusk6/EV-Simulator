@@ -89,6 +89,7 @@
 }
 
 .evsim-hc__table {
+  display: none;
   width: 100%;
   margin-top: 16px;
   border-collapse: separate;
@@ -98,6 +99,10 @@
   border-radius: 10px;
   background: #111111;
   color: #dddddd;
+}
+
+.evsim-hc__table.evsim-hc__table--visible {
+  display: table;
 }
 
 .evsim-hc__table td {
