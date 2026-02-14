@@ -7,7 +7,7 @@
   display: inline-block;
   width: auto;
   max-width: 100%;
-  font-family: Arial, sans-serif;
+  font-family: monospace;
 }
 
 .evsim-hc__row {
@@ -27,7 +27,8 @@
 
 .evsim-hc__rules summary {
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 400;          /* oder: normal */
+  text-decoration: underline;
   list-style: none;
   margin-bottom: 8px;
 }
