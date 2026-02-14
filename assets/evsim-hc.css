@@ -27,7 +27,7 @@
 
 .evsim-hc__rules summary {
   cursor: pointer;
-  font-weight: 400;
+  font-weight: 400;         /* oder: normal */
   text-decoration: underline;
   list-style: none;
   margin-bottom: 8px;
