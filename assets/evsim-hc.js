@@ -947,7 +947,7 @@
   const createRulesBlock = (container) => {
     const rulesBlock = document.createElement('details');
     rulesBlock.className = 'evsim-hc__rules';
-    rulesBlock.open = true;
+    rulesBlock.open = false;
 
     const summary = document.createElement('summary');
     summary.textContent = 'Tischregeln';

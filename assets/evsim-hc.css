@@ -16,11 +16,15 @@
 .evsim-hc::before {
   content: '';
   position: absolute;
-  inset: 0;
+  left: 50%;
+  top: 76px;
+  width: 200px;
+  height: 200px;
+  transform: translateX(-50%);
   background-image: url('https://blackjack-21.de/wp-content/uploads/2026/02/blackjack-21-logo.png');
   background-position: center;
   background-repeat: no-repeat;
-  background-size: 200px 200px;
+  background-size: contain;
   opacity: 0.1;
   transition: opacity 0.2s ease;
   pointer-events: none;
