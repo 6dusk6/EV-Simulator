@@ -1051,10 +1051,14 @@
         const rules = getSelectedRulesFromUI(container);
         const splitRuleTag = buildSplitRuleTag(rules);
 
-        const currentValueCells = tableBody.querySelectorAll('tr td:last-child');
-        currentValueCells.forEach((cell) => {
-          cell.textContent = '';
-          cell.classList.remove('evsim-hc__ev--best');
+        const currentRows = tableBody.querySelectorAll('tr');
+        currentRows.forEach((row) => {
+          const valueCell = row.querySelector('td:last-child');
+          if (!valueCell) {
+            return;
+          }
+          valueCell.textContent = '';
+          valueCell.classList.remove('evsim-hc__ev--best');
         });
         if (resultsTable) {
           resultsTable.classList.add('evsim-hc__table--visible');
