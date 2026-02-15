@@ -1038,55 +1038,72 @@
     const resultsTable = container.querySelector('.evsim-hc__table');
     const tableBody = container.querySelector('.evsim-hc__table tbody');
     const summary = container.querySelector('.evsim-hc__summary');
+    const defaultButtonLabel = button ? button.textContent : 'BERECHNEN';
+    const loadingButtonLabel = 'Berechne...';
 
     button.addEventListener('click', async () => {
       button.disabled = true;
-      const normalizedP1 = normalizeRank(p1.value);
-      const normalizedP2 = normalizeRank(p2.value);
-      const normalizedDealer = normalizeRank(dealer.value);
-      const rules = getSelectedRulesFromUI(container);
-      const splitRuleTag = buildSplitRuleTag(rules);
-      const { actions, evs } = computeAllActionsEV({
-        p1: normalizedP1,
-        p2: normalizedP2,
-        dealerUp: normalizedDealer,
-        includeSplit: false,
-        rules,
-      });
-      let splitCandidateValue = actions.includes('SPLIT') ? null : undefined;
-      let splitPrecompute = null;
-      let splitMissingLabel = null;
-      if (actions.includes('SPLIT')) {
-        splitPrecompute = await loadSplitPrecompute(splitRuleTag);
-        const splitKey = getSplitKey(normalizedP1, normalizedP2, normalizedDealer);
-        const splitValue = splitPrecompute ? splitPrecompute[splitKey] : null;
-        if (typeof splitValue === 'number') {
-          evs.SPLIT = splitValue;
-          splitCandidateValue = splitValue;
-        } else if (!splitPrecompute) {
-          splitMissingLabel = `Split-Precompute Datei fehlt: split-ev.${splitRuleTag}.json (key ${splitKey})`;
-        } else {
-          logMissingSplitKey(splitPrecompute, splitKey, splitRuleTag);
-          splitMissingLabel = `Split-Precompute hat keinen Wert für KEY ${splitKey} (ruleTag ${splitRuleTag})`;
+      button.textContent = loadingButtonLabel;
+      try {
+        const normalizedP1 = normalizeRank(p1.value);
+        const normalizedP2 = normalizeRank(p2.value);
+        const normalizedDealer = normalizeRank(dealer.value);
+        const rules = getSelectedRulesFromUI(container);
+        const splitRuleTag = buildSplitRuleTag(rules);
+        const { actions, evs } = computeAllActionsEV({
+          p1: normalizedP1,
+          p2: normalizedP2,
+          dealerUp: normalizedDealer,
+          includeSplit: false,
+          rules,
+        });
+        const pendingCandidates = getActionCandidates({
+          rules,
+          evHit: undefined,
+          evStand: undefined,
+          evDouble: actions.includes('DOUBLE') ? undefined : null,
+          evSplit: actions.includes('SPLIT') ? undefined : null,
+        });
+        renderResults(tableBody, pendingCandidates, {
+          missingLabel: '',
+        });
+        if (resultsTable) {
+          resultsTable.classList.add('evsim-hc__table--visible');
         }
+        let splitCandidateValue = actions.includes('SPLIT') ? null : undefined;
+        let splitPrecompute = null;
+        let splitMissingLabel = null;
+        if (actions.includes('SPLIT')) {
+          splitPrecompute = await loadSplitPrecompute(splitRuleTag);
+          const splitKey = getSplitKey(normalizedP1, normalizedP2, normalizedDealer);
+          const splitValue = splitPrecompute ? splitPrecompute[splitKey] : null;
+          if (typeof splitValue === 'number') {
+            evs.SPLIT = splitValue;
+            splitCandidateValue = splitValue;
+          } else if (!splitPrecompute) {
+            splitMissingLabel = `Split-Precompute Datei fehlt: split-ev.${splitRuleTag}.json (key ${splitKey})`;
+          } else {
+            logMissingSplitKey(splitPrecompute, splitKey, splitRuleTag);
+            splitMissingLabel = `Split-Precompute hat keinen Wert für KEY ${splitKey} (ruleTag ${splitRuleTag})`;
+          }
+        }
+        const candidates = getActionCandidates({
+          rules,
+          evHit: evs.HIT,
+          evStand: evs.STAND,
+          evDouble: actions.includes('DOUBLE') ? evs.DOUBLE : undefined,
+          evSplit: splitCandidateValue,
+        });
+        renderResults(tableBody, candidates, {
+          missingLabels: splitMissingLabel ? { SPLIT: splitMissingLabel } : {},
+        });
+        if (summary) {
+          summary.textContent = '';
+        }
+      } finally {
+        button.disabled = false;
+        button.textContent = defaultButtonLabel;
       }
-      const candidates = getActionCandidates({
-        rules,
-        evHit: evs.HIT,
-        evStand: evs.STAND,
-        evDouble: actions.includes('DOUBLE') ? evs.DOUBLE : undefined,
-        evSplit: splitCandidateValue,
-      });
-      renderResults(tableBody, candidates, {
-        missingLabels: splitMissingLabel ? { SPLIT: splitMissingLabel } : {},
-      });
-      if (resultsTable) {
-        resultsTable.classList.add('evsim-hc__table--visible');
-      }
-      if (summary) {
-        summary.textContent = '';
-      }
-      button.disabled = false;
     });
   };
 
