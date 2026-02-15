@@ -31,7 +31,27 @@ The calculator renders the dark-themed UI with three card selectors and a **BERE
 
 ## Local testing
 
-```
+```bash
 npm i
+```
+
+- Fast UI/smoke checks (default):
+
+```bash
 npm test
+# or
+npm run test:ui
+```
+
+- Full engine baseline checks (canon + smoke):
+
+```bash
+npm run test:full
+```
+
+- Re-generate canon fixtures (uses same split precompute source as canon tests):
+
+```bash
+npm run canon:gen
+npm run test:canon
 ```
