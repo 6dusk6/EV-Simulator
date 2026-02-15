@@ -65,7 +65,7 @@ function evsimulator_render_handcalc_shortcode(): string
             <?php echo $render_select('evsim-d', 'T', 'evsim-hc__select--card'); ?>
         </div>
         <div class="evsim-hc__summary"></div>
-        <button class="evsim-hc__btn" type="button">BERECHNE</button>
+        <button class="evsim-hc__btn" type="button">BERECHNEN</button>
         <table class="evsim-hc__table">
             <tbody></tbody>
         </table>

@@ -937,7 +937,7 @@
 
     const rows = [
       {
-        label: 'Decks',
+        label: 'Deckanzahl:',
         rule: 'decks',
         options: [
           { value: '6', label: '4+ Decks' },
@@ -947,7 +947,7 @@
         disabled: false,
       },
       {
-        label: 'Soft 17',
+        label: 'Soft 17:',
         rule: 'hitSoft17',
         options: [
           { value: 'stand', label: 'Stand' },
@@ -956,7 +956,7 @@
         disabled: false,
       },
       {
-        label: 'Double Down',
+        label: 'Double Down:',
         rule: 'doubleRule',
         options: [
           { value: '9-11', label: '9-11' },
@@ -966,7 +966,7 @@
         disabled: false,
       },
       {
-        label: 'DAS',
+        label: 'DAS:',
         rule: 'doubleAfterSplit',
         options: [
           { value: 'true', label: 'ja' },
@@ -975,7 +975,7 @@
         disabled: false,
       },
       {
-        label: 'Surrender',
+        label: 'Surrender:',
         rule: 'surrender',
         options: [
           { value: 'none', label: 'nein' },
@@ -984,7 +984,7 @@
         disabled: false,
       },
       {
-        label: 'Holecard Peek',
+        label: 'Holecard Peek:',
         rule: 'peek',
         options: [
           { value: 'false', label: 'nein' },
