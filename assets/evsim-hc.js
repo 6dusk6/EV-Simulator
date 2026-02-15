@@ -1050,6 +1050,24 @@
         const normalizedDealer = normalizeRank(dealer.value);
         const rules = getSelectedRulesFromUI(container);
         const splitRuleTag = buildSplitRuleTag(rules);
+
+        const currentValueCells = tableBody.querySelectorAll('tr td:last-child');
+        currentValueCells.forEach((cell) => {
+          cell.textContent = '';
+          cell.classList.remove('evsim-hc__ev--best');
+        });
+        if (resultsTable) {
+          resultsTable.classList.add('evsim-hc__table--visible');
+        }
+
+        await new Promise((resolve) => {
+          if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => resolve());
+            return;
+          }
+          setTimeout(resolve, 0);
+        });
+
         const { actions, evs } = computeAllActionsEV({
           p1: normalizedP1,
           p2: normalizedP2,
@@ -1057,19 +1075,6 @@
           includeSplit: false,
           rules,
         });
-        const pendingCandidates = getActionCandidates({
-          rules,
-          evHit: undefined,
-          evStand: undefined,
-          evDouble: actions.includes('DOUBLE') ? undefined : null,
-          evSplit: actions.includes('SPLIT') ? undefined : null,
-        });
-        renderResults(tableBody, pendingCandidates, {
-          missingLabel: '',
-        });
-        if (resultsTable) {
-          resultsTable.classList.add('evsim-hc__table--visible');
-        }
         let splitCandidateValue = actions.includes('SPLIT') ? null : undefined;
         let splitPrecompute = null;
         let splitMissingLabel = null;
