@@ -806,6 +806,19 @@
     return labels[action] ?? action;
   };
 
+  const wait = (ms) => new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+  const waitForNextPaint = () =>
+    new Promise((resolve) => {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => resolve());
+        return;
+      }
+      setTimeout(resolve, 0);
+    });
+
   const renderResults = (
     tableBody,
     candidates,
@@ -1040,6 +1053,7 @@
     const summary = container.querySelector('.evsim-hc__summary');
     const defaultButtonLabel = button ? button.textContent : 'BERECHNEN';
     const loadingButtonLabel = 'Berechne...';
+    const minimumLoadingStateMs = 180;
 
     button.addEventListener('click', async () => {
       button.disabled = true;
@@ -1064,13 +1078,8 @@
           resultsTable.classList.add('evsim-hc__table--visible');
         }
 
-        await new Promise((resolve) => {
-          if (typeof requestAnimationFrame === 'function') {
-            requestAnimationFrame(() => resolve());
-            return;
-          }
-          setTimeout(resolve, 0);
-        });
+        await waitForNextPaint();
+        await wait(minimumLoadingStateMs);
 
         const { actions, evs } = computeAllActionsEV({
           p1: normalizedP1,
