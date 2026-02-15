@@ -936,6 +936,14 @@
     return rules;
   };
 
+  const setCollapsedRulesWatermarkState = (container, rulesBlock) => {
+    if (!container || !rulesBlock) {
+      return;
+    }
+
+    container.classList.toggle('evsim-hc--rules-collapsed', !rulesBlock.open);
+  };
+
   const createRulesBlock = (container) => {
     const rulesBlock = document.createElement('details');
     rulesBlock.className = 'evsim-hc__rules';
@@ -1040,10 +1048,17 @@
     } else {
       container.prepend(rulesBlock);
     }
+
+    return rulesBlock;
   };
 
   const initCalculator = (container) => {
-    createRulesBlock(container);
+    const rulesBlock = createRulesBlock(container);
+    setCollapsedRulesWatermarkState(container, rulesBlock);
+    rulesBlock.addEventListener('toggle', () => {
+      setCollapsedRulesWatermarkState(container, rulesBlock);
+    });
+
     const p1 = container.querySelector('#evsim-p1');
     const p2 = container.querySelector('#evsim-p2');
     const dealer = container.querySelector('#evsim-d');

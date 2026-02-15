@@ -9,6 +9,30 @@
   max-width: 100%;
   margin-inline: auto;
   font-family: monospace;
+  position: relative;
+  overflow: hidden;
+}
+
+.evsim-hc::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('https://blackjack-21.de/wp-content/uploads/2026/02/blackjack-21-logo-1.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: min(220px, 70%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.evsim-hc.evsim-hc--rules-collapsed::before {
+  opacity: 0.12;
+}
+
+.evsim-hc > * {
+  position: relative;
+  z-index: 1;
 }
 
 .evsim-hc__row {
