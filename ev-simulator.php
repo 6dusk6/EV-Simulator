@@ -15,8 +15,13 @@ if (!defined('ABSPATH')) {
 function evsimulator_render_handcalc_shortcode(): string
 {
     $asset_url = plugin_dir_url(__FILE__);
-    wp_enqueue_style('evsim-hc', $asset_url . 'assets/evsim-hc.css', [], '0.1.0');
-    wp_enqueue_script('evsim-hc', $asset_url . 'assets/evsim-hc.js', [], '0.1.0', true);
+    $style_path = plugin_dir_path(__FILE__) . 'assets/evsim-hc.css';
+    $script_path = plugin_dir_path(__FILE__) . 'assets/evsim-hc.js';
+    $style_version = (string) filemtime($style_path);
+    $script_version = (string) filemtime($script_path);
+
+    wp_enqueue_style('evsim-hc', $asset_url . 'assets/evsim-hc.css', [], $style_version);
+    wp_enqueue_script('evsim-hc', $asset_url . 'assets/evsim-hc.js', [], $script_version, true);
 
     $options = [
         ['value' => '2', 'label' => '2'],
